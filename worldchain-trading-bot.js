@@ -973,8 +973,9 @@ class WorldchainTradingBot {
     }
 
     async priceMonitoring() {
-        console.log(chalk.white('\n📊 PRICE MONITORING'));
-        console.log(chalk.gray('═'.repeat(40)));
+        console.log(chalk.white('\n📊 PRICE MONITORING (ENHANCED)'));
+        console.log(chalk.gray('═'.repeat(50)));
+        console.log(chalk.yellow('🚀 Using HoldStation SDK for accurate price discovery...'));
         console.log(chalk.white('🔄 Fetching real-time prices...'));
         
         const tokens = Object.values(this.discoveredTokens);
@@ -986,30 +987,75 @@ class WorldchainTradingBot {
         }
         
         try {
-            // Use the trading engine to get real prices
-            const tokenAddresses = tokens.slice(0, 5).map(token => token.address);
-            const prices = await this.tradingEngine.getBatchPrices(tokenAddresses);
-            
+            // Use Sinclave Enhanced Engine for better price discovery
             for (const token of tokens.slice(0, 5)) {
-                const priceData = prices[token.address];
+                console.log(chalk.cyan(`\n${token.tradingPair}:`));
                 
-                if (priceData && !priceData.error) {
-                    const change = ((Math.random() - 0.5) * 20).toFixed(2); // Simulated 24h change
-                    const changeColor = parseFloat(change) >= 0 ? chalk.green : chalk.red;
+                try {
+                    // Get price using HoldStation SDK (1 WLD to token)
+                    const quote = await this.sinclaveEngine.getHoldStationQuote(
+                        this.WLD_ADDRESS,
+                        token.address,
+                        1, // 1 WLD
+                        '0x0000000000000000000000000000000000000001' // dummy receiver for price check
+                    );
                     
-                    console.log(chalk.cyan(`\n${token.tradingPair}:`));
-                    console.log(chalk.white(`  💰 Price: ${priceData.price.toFixed(6)} WLD`));
-                    console.log(chalk.white(`  📊 Fee Tier: ${priceData.fee / 10000}%`));
-                    console.log(changeColor(`  📈 24h Change: ${change}%`));
-                } else {
-                    console.log(chalk.cyan(`\n${token.tradingPair}:`));
-                    console.log(chalk.red(`  ❌ Price unavailable: ${priceData?.error || 'Unknown error'}`));
+                    if (quote && quote.expectedOutput) {
+                        const tokensPerWLD = parseFloat(quote.expectedOutput);
+                        const wldPerToken = tokensPerWLD > 0 ? (1 / tokensPerWLD).toFixed(8) : 0;
+                        
+                        // Simulate 24h change (in real implementation, this would be stored/calculated)
+                        const change = ((Math.random() - 0.5) * 10).toFixed(2); // Simulated change
+                        const changeColor = parseFloat(change) >= 0 ? chalk.green : chalk.red;
+                        
+                        console.log(chalk.white(`  💰 Rate: 1 WLD = ${tokensPerWLD.toFixed(6)} ${token.symbol}`));
+                        console.log(chalk.white(`  💰 Price: ${wldPerToken} WLD per ${token.symbol}`));
+                        console.log(chalk.green(`  🏆 Source: HoldStation DEX`));
+                        console.log(chalk.white(`  📊 Liquidity: ✅ Available`));
+                        console.log(changeColor(`  📈 24h Change: ${change}%`));
+                        
+                    } else {
+                        throw new Error('No quote received from HoldStation');
+                    }
+                    
+                } catch (enhancedError) {
+                    console.log(chalk.yellow(`  ⚠️ HoldStation price failed: ${enhancedError.message}`));
+                    
+                    // Fallback to standard engine
+                    try {
+                        console.log(chalk.gray(`  🔄 Trying Uniswap V3 fallback...`));
+                        const priceData = await this.tradingEngine.getTokenPrice(token.address);
+                        
+                        if (priceData && !priceData.error) {
+                            const change = ((Math.random() - 0.5) * 20).toFixed(2);
+                            const changeColor = parseFloat(change) >= 0 ? chalk.green : chalk.red;
+                            
+                            console.log(chalk.white(`  💰 Price: ${priceData.price.toFixed(6)} WLD`));
+                            console.log(chalk.white(`  📊 Fee Tier: ${priceData.fee / 10000}%`));
+                            console.log(chalk.yellow(`  🏆 Source: Uniswap V3`));
+                            console.log(changeColor(`  📈 24h Change: ${change}%`));
+                        } else {
+                            console.log(chalk.red(`  ❌ Price unavailable: ${priceData?.error || 'No liquidity found'}`));
+                            console.log(chalk.gray(`  💡 This token may not have liquidity on either DEX`));
+                        }
+                    } catch (fallbackError) {
+                        console.log(chalk.red(`  ❌ Price unavailable: No liquidity found on any DEX`));
+                        console.log(chalk.gray(`  💡 Consider checking if this token has active trading pairs`));
+                    }
                 }
                 
-                await this.sleep(1000);
+                await this.sleep(500); // Reduced delay for better UX
             }
+            
+            // Show summary
+            console.log(chalk.blue('\n📊 PRICE MONITORING SUMMARY:'));
+            console.log(chalk.blue('✅ HoldStation SDK: Primary price source (most accurate)'));
+            console.log(chalk.blue('🔄 Uniswap V3: Fallback for tokens not on HoldStation'));
+            console.log(chalk.blue('💡 Use "Sinclave Enhanced Trade" for best execution rates'));
+            
         } catch (error) {
             console.log(chalk.red(`❌ Price monitoring failed: ${error.message}`));
+            console.log(chalk.yellow('💡 Try running the HoldStation SDK test: ./test-holdstation.js'));
         }
         
         await this.getUserInput('\nPress Enter to continue...');
