@@ -18,10 +18,22 @@ class WorldchainTradingBot {
         this.walletsPath = path.join(__dirname, 'wallets.json');
         this.tokensPath = path.join(__dirname, 'discovered_tokens.json');
         
-        // Worldchain RPC endpoint (Layer 2)
-        this.provider = new ethers.JsonRpcProvider(
-            process.env.WORLDCHAIN_RPC_URL || 'https://worldchain-mainnet.g.alchemy.com/public'
-        );
+        // Worldchain RPC endpoint (Layer 2) - Multiple endpoints for reliability
+        const rpcEndpoints = [
+            process.env.WORLDCHAIN_RPC_URL,
+            'https://worldchain-mainnet.g.alchemy.com/public',
+            'https://worldchain.drpc.org',
+            'https://worldchain-rpc.publicnode.com'
+        ].filter(Boolean);
+        
+        this.provider = new ethers.JsonRpcProvider(rpcEndpoints[0]);
+        
+        // Configure network for Worldchain
+        this.provider._network = {
+            name: 'worldchain',
+            chainId: 480,
+            ensAddress: null
+        };
         
         this.config = this.loadConfig();
         this.wallets = this.loadWallets();
