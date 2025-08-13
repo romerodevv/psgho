@@ -169,6 +169,9 @@ class TradingStrategy extends EventEmitter {
             }
             
             // Create position record (works with both engines)
+            const calculatedPrice = currentPrice || (result.tokensReceived && result.tokensSpent ? 
+                parseFloat(result.tokensSpent) / parseFloat(result.tokensReceived) : 0);
+            
             const position = {
                 id: `pos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 tokenAddress: tokenAddress,
@@ -176,15 +179,14 @@ class TradingStrategy extends EventEmitter {
                 status: 'open',
                 
                 // Entry data
-                entryPrice: currentPrice || (result.tokensReceived && result.tokensSpent ? 
-                    parseFloat(result.tokensSpent) / parseFloat(result.tokensReceived) : 0),
+                entryPrice: calculatedPrice,
                 entryAmountWLD: parseFloat(amountWLD),
                 entryAmountToken: parseFloat(result.amountOut || result.tokensReceived || 0),
                 entryTimestamp: Date.now(),
                 entryTxHash: result.txHash || result.transactionHash,
                 
                 // Current data (updated by monitoring)
-                currentPrice: currentPrice,
+                currentPrice: calculatedPrice,
                 currentValue: parseFloat(amountWLD), // Current value in WLD
                 unrealizedPnL: 0,
                 unrealizedPnLPercent: 0,
@@ -192,18 +194,18 @@ class TradingStrategy extends EventEmitter {
                 // Strategy data
                 profitTarget: this.strategyConfig.profitTarget,
                 stopLoss: this.strategyConfig.stopLossThreshold,
-                highestPrice: currentPrice, // For trailing stop
+                highestPrice: calculatedPrice, // For trailing stop
                 trailingStopPrice: null,
                 
                 // Trade history
                 trades: [{
                     type: 'buy',
                     timestamp: Date.now(),
-                    price: currentPrice,
+                    price: calculatedPrice,
                     amountWLD: parseFloat(amountWLD),
-                    amountToken: parseFloat(result.amountOut),
-                    txHash: result.txHash,
-                    gasUsed: result.gasUsed
+                    amountToken: parseFloat(result.amountOut || result.tokensReceived || 0),
+                    txHash: result.txHash || result.transactionHash,
+                    gasUsed: result.gasUsed || 'N/A'
                 }]
             };
             
@@ -218,7 +220,9 @@ class TradingStrategy extends EventEmitter {
             this.totalTrades++;
             
             console.log(`✅ Position opened: ${position.id}`);
-            console.log(`📊 Entry: ${amountWLD} WLD -> ${result.amountOut} tokens at ${currentPrice.toFixed(8)} WLD/token`);
+            const tokensReceived = result.amountOut || result.tokensReceived || 'Unknown';
+            const priceDisplay = calculatedPrice > 0 ? calculatedPrice.toFixed(8) : 'Unknown';
+            console.log(`📊 Entry: ${amountWLD} WLD -> ${tokensReceived} tokens at ${priceDisplay} WLD/token`);
             
             this.emit('positionOpened', position);
             return position;
