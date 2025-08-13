@@ -26,14 +26,14 @@ class WorldchainTradingBot {
             'https://worldchain-rpc.publicnode.com'
         ].filter(Boolean);
         
-        this.provider = new ethers.JsonRpcProvider(rpcEndpoints[0]);
-        
-        // Configure network for Worldchain
-        this.provider._network = {
+        // Create provider with Worldchain network configuration
+        const worldchainNetwork = {
             name: 'worldchain',
             chainId: 480,
             ensAddress: null
         };
+        
+        this.provider = new ethers.JsonRpcProvider(rpcEndpoints[0], worldchainNetwork);
         
         this.config = this.loadConfig();
         this.wallets = this.loadWallets();
