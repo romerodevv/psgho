@@ -9,6 +9,7 @@ const chalk = require('chalk');
 const figlet = require('figlet');
 const AdvancedTradingEngine = require('./trading-engine');
 const TokenDiscoveryService = require('./token-discovery');
+const TradingStrategy = require('./trading-strategy');
 require('dotenv').config();
 
 class WorldchainTradingBot {
@@ -29,6 +30,10 @@ class WorldchainTradingBot {
         // Initialize advanced modules
         this.tradingEngine = new AdvancedTradingEngine(this.provider, this.config);
         this.tokenDiscovery = new TokenDiscoveryService(this.provider, this.config);
+        this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config);
+        
+        // Setup strategy event listeners
+        this.setupStrategyEventListeners();
         
         // WLD token address on Worldchain
         this.WLD_ADDRESS = '0x163f8c2467924be0ae7b5347228cabf260318753';
@@ -108,9 +113,10 @@ class WorldchainTradingBot {
         console.log(chalk.cyan('1. 💼 Wallet Management'));
         console.log(chalk.cyan('2. 🔍 Token Discovery & Portfolio'));
         console.log(chalk.cyan('3. 📈 Trading Operations'));
-        console.log(chalk.cyan('4. ⚙️  Configuration'));
-        console.log(chalk.cyan('5. 📊 Portfolio Overview'));
-        console.log(chalk.red('6. 🚪 Exit'));
+        console.log(chalk.cyan('4. 🎯 Strategy Management'));
+        console.log(chalk.cyan('5. ⚙️  Configuration'));
+        console.log(chalk.cyan('6. 📊 Portfolio Overview'));
+        console.log(chalk.red('7. 🚪 Exit'));
         console.log(chalk.gray('─'.repeat(30)));
     }
 
@@ -943,6 +949,541 @@ class WorldchainTradingBot {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    // Setup strategy event listeners
+    setupStrategyEventListeners() {
+        this.tradingStrategy.on('positionOpened', (position) => {
+            console.log(chalk.green(`\n🎯 NEW POSITION OPENED:`));
+            console.log(chalk.white(`📝 ID: ${position.id}`));
+            console.log(chalk.white(`🪙 Token: ${position.tokenAddress}`));
+            console.log(chalk.white(`💰 Amount: ${position.entryAmountWLD} WLD`));
+            console.log(chalk.white(`📊 Entry Price: ${position.entryPrice.toFixed(8)} WLD/token`));
+        });
+
+        this.tradingStrategy.on('positionClosed', (position) => {
+            const pnlColor = position.realizedPnL >= 0 ? chalk.green : chalk.red;
+            console.log(pnlColor(`\n🎯 POSITION CLOSED:`));
+            console.log(chalk.white(`📝 ID: ${position.id}`));
+            console.log(chalk.white(`🪙 Token: ${position.tokenAddress}`));
+            console.log(chalk.white(`🔄 Reason: ${position.closeReason}`));
+            console.log(pnlColor(`💰 P&L: ${position.realizedPnL.toFixed(4)} WLD (${position.realizedPnLPercent.toFixed(2)}%)`));
+        });
+
+        this.tradingStrategy.on('dipOpportunity', (opportunity) => {
+            console.log(chalk.yellow(`\n📉 DIP OPPORTUNITY DETECTED:`));
+            console.log(chalk.white(`🪙 Token: ${opportunity.tokenAddress}`));
+            console.log(chalk.white(`📊 Current Price: ${opportunity.currentPrice.toFixed(8)} WLD`));
+            console.log(chalk.white(`📊 Average Price: ${opportunity.avgPrice.toFixed(8)} WLD`));
+            console.log(chalk.yellow(`📉 DIP: ${opportunity.dipPercent.toFixed(2)}% below average`));
+        });
+
+        this.tradingStrategy.on('priceUpdate', (update) => {
+            if (Math.abs(update.unrealizedPnLPercent) > 0.5) { // Only show significant changes
+                const pnlColor = update.unrealizedPnLPercent >= 0 ? chalk.green : chalk.red;
+                console.log(pnlColor(`📊 ${update.tokenAddress}: ${update.unrealizedPnLPercent.toFixed(2)}% P&L`));
+            }
+        });
+    }
+
+    // Strategy Management Menu
+    async strategyManagementMenu() {
+        while (true) {
+            await this.displayHeader();
+            const stats = this.tradingStrategy.getStrategyStats();
+            
+            console.log(chalk.white('\n🎯 STRATEGY MANAGEMENT'));
+            console.log(chalk.gray('─'.repeat(40)));
+            console.log(chalk.white(`📊 Status: ${stats.isRunning ? chalk.green('RUNNING') : chalk.red('STOPPED')}`));
+            console.log(chalk.white(`📈 Open Positions: ${stats.openPositions}`));
+            console.log(chalk.white(`💰 Total P&L: ${stats.totalPnL.toFixed(4)} WLD`));
+            console.log(chalk.white(`📊 Success Rate: ${stats.successRate.toFixed(1)}%`));
+            console.log(chalk.gray('─'.repeat(40)));
+            
+            console.log(chalk.cyan('1. 🚀 Start Strategy'));
+            console.log(chalk.cyan('2. 🛑 Stop Strategy'));
+            console.log(chalk.cyan('3. 📊 View Positions'));
+            console.log(chalk.cyan('4. 🎯 Execute Strategic Trade'));
+            console.log(chalk.cyan('5. ⚙️  Strategy Configuration'));
+            console.log(chalk.cyan('6. 📈 Strategy Statistics'));
+            console.log(chalk.cyan('7. 🔄 Close All Positions'));
+            console.log(chalk.red('8. ⬅️  Back to Main Menu'));
+            
+            const choice = await this.getUserInput('\nSelect option: ');
+            
+            switch (choice) {
+                case '1':
+                    await this.startStrategy();
+                    break;
+                case '2':
+                    await this.stopStrategy();
+                    break;
+                case '3':
+                    await this.viewPositions();
+                    break;
+                case '4':
+                    await this.executeStrategicTrade();
+                    break;
+                case '5':
+                    await this.strategyConfiguration();
+                    break;
+                case '6':
+                    await this.viewStrategyStatistics();
+                    break;
+                case '7':
+                    await this.closeAllPositions();
+                    break;
+                case '8':
+                    return;
+                default:
+                    console.log(chalk.red('❌ Invalid option'));
+                    await this.sleep(1500);
+            }
+        }
+    }
+
+    // Start Strategy
+    async startStrategy() {
+        try {
+            if (this.tradingStrategy.isRunning) {
+                console.log(chalk.yellow('\n⚠️ Strategy is already running'));
+                await this.getUserInput('\nPress Enter to continue...');
+                return;
+            }
+
+            console.log(chalk.white('\n🚀 Starting Trading Strategy...'));
+            await this.tradingStrategy.startStrategy();
+            
+            console.log(chalk.green('\n✅ Strategy started successfully!'));
+            console.log(chalk.white('📊 The bot will now monitor prices every 5 seconds'));
+            console.log(chalk.white('🎯 Automatic trades will execute based on profit targets'));
+            console.log(chalk.white('📉 DIP buying opportunities will be detected'));
+            
+        } catch (error) {
+            console.log(chalk.red(`❌ Failed to start strategy: ${error.message}`));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    // Stop Strategy
+    async stopStrategy() {
+        try {
+            if (!this.tradingStrategy.isRunning) {
+                console.log(chalk.yellow('\n⚠️ Strategy is not running'));
+                await this.getUserInput('\nPress Enter to continue...');
+                return;
+            }
+
+            console.log(chalk.white('\n🛑 Stopping Trading Strategy...'));
+            await this.tradingStrategy.stopStrategy();
+            
+            console.log(chalk.green('\n✅ Strategy stopped successfully!'));
+            console.log(chalk.white('📊 All position monitoring has been stopped'));
+            console.log(chalk.white('💾 Positions and data have been saved'));
+            
+        } catch (error) {
+            console.log(chalk.red(`❌ Failed to stop strategy: ${error.message}`));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    // View Positions
+    async viewPositions() {
+        const positions = this.tradingStrategy.getAllPositions();
+        
+        if (positions.length === 0) {
+            console.log(chalk.yellow('\n📭 No positions found'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        console.log(chalk.white('\n📊 TRADING POSITIONS'));
+        console.log(chalk.gray('═'.repeat(80)));
+        
+        const openPositions = positions.filter(p => p.status === 'open');
+        const closedPositions = positions.filter(p => p.status === 'closed');
+        
+        if (openPositions.length > 0) {
+            console.log(chalk.green('\n🟢 OPEN POSITIONS:'));
+            openPositions.forEach((pos, index) => {
+                const pnlColor = pos.unrealizedPnLPercent >= 0 ? chalk.green : chalk.red;
+                console.log(chalk.cyan(`\n${index + 1}. ${pos.tokenAddress}`));
+                console.log(chalk.white(`   💰 Entry: ${pos.entryAmountWLD} WLD -> ${pos.entryAmountToken} tokens`));
+                console.log(chalk.white(`   📊 Entry Price: ${pos.entryPrice.toFixed(8)} WLD/token`));
+                console.log(chalk.white(`   📈 Current Price: ${pos.currentPrice.toFixed(8)} WLD/token`));
+                console.log(chalk.white(`   💵 Current Value: ${pos.currentValue.toFixed(4)} WLD`));
+                console.log(pnlColor(`   📊 P&L: ${pos.unrealizedPnL.toFixed(4)} WLD (${pos.unrealizedPnLPercent.toFixed(2)}%)`));
+                console.log(chalk.white(`   🎯 Target: ${pos.profitTarget}% | Stop: ${pos.stopLoss}%`));
+                console.log(chalk.gray(`   📅 Opened: ${new Date(pos.entryTimestamp).toLocaleString()}`));
+            });
+        }
+        
+        if (closedPositions.length > 0) {
+            console.log(chalk.red('\n🔴 CLOSED POSITIONS (Last 5):'));
+            closedPositions.slice(-5).forEach((pos, index) => {
+                const pnlColor = pos.realizedPnL >= 0 ? chalk.green : chalk.red;
+                console.log(chalk.cyan(`\n${index + 1}. ${pos.tokenAddress}`));
+                console.log(chalk.white(`   💰 Trade: ${pos.entryAmountWLD} WLD -> ${pos.exitAmountWLD} WLD`));
+                console.log(chalk.white(`   📊 Entry: ${pos.entryPrice.toFixed(8)} | Exit: ${pos.exitPrice.toFixed(8)}`));
+                console.log(pnlColor(`   📊 P&L: ${pos.realizedPnL.toFixed(4)} WLD (${pos.realizedPnLPercent.toFixed(2)}%)`));
+                console.log(chalk.white(`   🔄 Reason: ${pos.closeReason}`));
+                console.log(chalk.gray(`   📅 Duration: ${((pos.exitTimestamp - pos.entryTimestamp) / 60000).toFixed(1)} min`));
+            });
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    // Execute Strategic Trade
+    async executeStrategicTrade() {
+        if (this.wallets.length === 0) {
+            console.log(chalk.yellow('\n📭 No wallets found!'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        const tokens = Object.values(this.discoveredTokens);
+        if (tokens.length === 0) {
+            console.log(chalk.yellow('\n📭 No tokens available! Discover tokens first.'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        try {
+            // Select wallet
+            console.log(chalk.white('\n💼 SELECT WALLET:'));
+            this.wallets.forEach((wallet, index) => {
+                console.log(chalk.cyan(`${index + 1}. ${wallet.name} (${wallet.address.slice(0, 10)}...)`));
+            });
+            
+            const walletChoice = await this.getUserInput('\nSelect wallet: ');
+            const walletIndex = parseInt(walletChoice) - 1;
+            
+            if (walletIndex < 0 || walletIndex >= this.wallets.length) {
+                console.log(chalk.red('❌ Invalid wallet selection'));
+                await this.getUserInput('\nPress Enter to continue...');
+                return;
+            }
+            
+            const selectedWallet = this.wallets[walletIndex];
+            
+            // Select token
+            console.log(chalk.white('\n🪙 SELECT TOKEN:'));
+            tokens.forEach((token, index) => {
+                console.log(chalk.cyan(`${index + 1}. ${token.symbol} (${token.name})`));
+            });
+            
+            const tokenChoice = await this.getUserInput('\nSelect token: ');
+            const tokenIndex = parseInt(tokenChoice) - 1;
+            
+            if (tokenIndex < 0 || tokenIndex >= tokens.length) {
+                console.log(chalk.red('❌ Invalid token selection'));
+                await this.getUserInput('\nPress Enter to continue...');
+                return;
+            }
+            
+            const selectedToken = tokens[tokenIndex];
+            
+            // Get amount
+            const amount = await this.getUserInput('Enter WLD amount to trade: ');
+            const amountWLD = parseFloat(amount);
+            
+            if (!amountWLD || amountWLD <= 0) {
+                console.log(chalk.red('❌ Invalid amount'));
+                await this.getUserInput('\nPress Enter to continue...');
+                return;
+            }
+            
+            // Execute strategic trade
+            console.log(chalk.white('\n🎯 EXECUTING STRATEGIC TRADE...'));
+            console.log(chalk.gray('═'.repeat(50)));
+            
+            const position = await this.tradingStrategy.executeBuyTrade(
+                selectedWallet,
+                selectedToken.address,
+                amountWLD
+            );
+            
+            console.log(chalk.green('\n✅ Strategic trade executed successfully!'));
+            console.log(chalk.white(`📝 Position ID: ${position.id}`));
+            console.log(chalk.white(`🎯 Profit Target: ${position.profitTarget}%`));
+            console.log(chalk.white(`🛑 Stop Loss: ${position.stopLoss}%`));
+            console.log(chalk.white('📊 Position is now being monitored automatically'));
+            
+        } catch (error) {
+            console.log(chalk.red(`❌ Strategic trade failed: ${error.message}`));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    // Strategy Configuration
+    async strategyConfiguration() {
+        while (true) {
+            await this.displayHeader();
+            const config = this.tradingStrategy.strategyConfig;
+            
+            console.log(chalk.white('\n⚙️ STRATEGY CONFIGURATION'));
+            console.log(chalk.gray('═'.repeat(50)));
+            console.log(chalk.white(`🎯 Profit Target: ${config.profitTarget}%`));
+            console.log(chalk.white(`📉 DIP Buy Threshold: ${config.dipBuyThreshold}%`));
+            console.log(chalk.white(`⚠️ Max Slippage: ${config.maxSlippage}%`));
+            console.log(chalk.white(`🛑 Stop Loss: ${config.stopLossThreshold}%`));
+            console.log(chalk.white(`💰 Max Position Size: ${config.maxPositionSize} WLD`));
+            console.log(chalk.white(`📊 Max Open Positions: ${config.maxOpenPositions}`));
+            console.log(chalk.white(`⏱️ Price Check Interval: ${config.priceCheckInterval/1000}s`));
+            console.log(chalk.gray('═'.repeat(50)));
+            
+            console.log(chalk.cyan('1. 🎯 Set Profit Target'));
+            console.log(chalk.cyan('2. 📉 Set DIP Buy Threshold'));
+            console.log(chalk.cyan('3. ⚠️ Set Max Slippage'));
+            console.log(chalk.cyan('4. 🛑 Set Stop Loss'));
+            console.log(chalk.cyan('5. 💰 Set Position Limits'));
+            console.log(chalk.cyan('6. ⏱️ Set Monitoring Interval'));
+            console.log(chalk.cyan('7. 🔄 Enable/Disable Features'));
+            console.log(chalk.red('8. ⬅️  Back'));
+            
+            const choice = await this.getUserInput('\nSelect option: ');
+            
+            switch (choice) {
+                case '1':
+                    await this.configureProfit();
+                    break;
+                case '2':
+                    await this.configureDipBuy();
+                    break;
+                case '3':
+                    await this.configureSlippage();
+                    break;
+                case '4':
+                    await this.configureStopLoss();
+                    break;
+                case '5':
+                    await this.configurePositionLimits();
+                    break;
+                case '6':
+                    await this.configureInterval();
+                    break;
+                case '7':
+                    await this.configureFeatures();
+                    break;
+                case '8':
+                    return;
+                default:
+                    console.log(chalk.red('❌ Invalid option'));
+                    await this.sleep(1500);
+            }
+        }
+    }
+
+    // Configure profit target
+    async configureProfit() {
+        const current = this.tradingStrategy.strategyConfig.profitTarget;
+        const input = await this.getUserInput(`Enter profit target % (current: ${current}%): `);
+        
+        const value = parseFloat(input);
+        if (value && value > 0 && value <= 100) {
+            this.tradingStrategy.updateConfig({ profitTarget: value });
+            console.log(chalk.green(`✅ Profit target set to ${value}%`));
+        } else {
+            console.log(chalk.red('❌ Invalid profit target'));
+        }
+        
+        await this.sleep(1500);
+    }
+
+    // Configure DIP buy threshold
+    async configureDipBuy() {
+        const current = this.tradingStrategy.strategyConfig.dipBuyThreshold;
+        const input = await this.getUserInput(`Enter DIP buy threshold % (current: ${current}%): `);
+        
+        const value = parseFloat(input);
+        if (value && value > 0 && value <= 50) {
+            this.tradingStrategy.updateConfig({ dipBuyThreshold: value });
+            console.log(chalk.green(`✅ DIP buy threshold set to ${value}%`));
+        } else {
+            console.log(chalk.red('❌ Invalid DIP threshold'));
+        }
+        
+        await this.sleep(1500);
+    }
+
+    // Configure max slippage
+    async configureSlippage() {
+        const current = this.tradingStrategy.strategyConfig.maxSlippage;
+        const input = await this.getUserInput(`Enter max slippage % (current: ${current}%): `);
+        
+        const value = parseFloat(input);
+        if (value && value > 0 && value <= 10) {
+            this.tradingStrategy.updateConfig({ maxSlippage: value });
+            console.log(chalk.green(`✅ Max slippage set to ${value}%`));
+        } else {
+            console.log(chalk.red('❌ Invalid slippage value'));
+        }
+        
+        await this.sleep(1500);
+    }
+
+    // Configure stop loss
+    async configureStopLoss() {
+        const current = this.tradingStrategy.strategyConfig.stopLossThreshold;
+        const input = await this.getUserInput(`Enter stop loss % (current: ${current}%): `);
+        
+        const value = parseFloat(input);
+        if (value && value < 0 && value >= -50) {
+            this.tradingStrategy.updateConfig({ stopLossThreshold: value });
+            console.log(chalk.green(`✅ Stop loss set to ${value}%`));
+        } else {
+            console.log(chalk.red('❌ Invalid stop loss value'));
+        }
+        
+        await this.sleep(1500);
+    }
+
+    // Configure position limits
+    async configurePositionLimits() {
+        const currentSize = this.tradingStrategy.strategyConfig.maxPositionSize;
+        const currentCount = this.tradingStrategy.strategyConfig.maxOpenPositions;
+        
+        const sizeInput = await this.getUserInput(`Enter max position size in WLD (current: ${currentSize}): `);
+        const countInput = await this.getUserInput(`Enter max open positions (current: ${currentCount}): `);
+        
+        const size = parseFloat(sizeInput);
+        const count = parseInt(countInput);
+        
+        const updates = {};
+        
+        if (size && size > 0 && size <= 10000) {
+            updates.maxPositionSize = size;
+        }
+        
+        if (count && count > 0 && count <= 20) {
+            updates.maxOpenPositions = count;
+        }
+        
+        if (Object.keys(updates).length > 0) {
+            this.tradingStrategy.updateConfig(updates);
+            console.log(chalk.green('✅ Position limits updated'));
+        } else {
+            console.log(chalk.red('❌ Invalid values'));
+        }
+        
+        await this.sleep(1500);
+    }
+
+    // Configure monitoring interval
+    async configureInterval() {
+        const current = this.tradingStrategy.strategyConfig.priceCheckInterval / 1000;
+        const input = await this.getUserInput(`Enter price check interval in seconds (current: ${current}s): `);
+        
+        const value = parseInt(input);
+        if (value && value >= 1 && value <= 300) {
+            this.tradingStrategy.updateConfig({ priceCheckInterval: value * 1000 });
+            console.log(chalk.green(`✅ Price check interval set to ${value}s`));
+        } else {
+            console.log(chalk.red('❌ Invalid interval (1-300 seconds)'));
+        }
+        
+        await this.sleep(1500);
+    }
+
+    // Configure features
+    async configureFeatures() {
+        const config = this.tradingStrategy.strategyConfig;
+        
+        console.log(chalk.white('\n🔄 FEATURE TOGGLES'));
+        console.log(chalk.gray('─'.repeat(30)));
+        console.log(chalk.white(`Auto Sell: ${config.enableAutoSell ? chalk.green('ON') : chalk.red('OFF')}`));
+        console.log(chalk.white(`DIP Buying: ${config.enableDipBuying ? chalk.green('ON') : chalk.red('OFF')}`));
+        console.log(chalk.white(`Trailing Stop: ${config.enableTrailingStop ? chalk.green('ON') : chalk.red('OFF')}`));
+        
+        const feature = await this.getUserInput('\nWhich feature to toggle? (auto/dip/trailing/cancel): ');
+        
+        switch (feature.toLowerCase()) {
+            case 'auto':
+                this.tradingStrategy.updateConfig({ enableAutoSell: !config.enableAutoSell });
+                console.log(chalk.green(`✅ Auto sell ${!config.enableAutoSell ? 'enabled' : 'disabled'}`));
+                break;
+            case 'dip':
+                this.tradingStrategy.updateConfig({ enableDipBuying: !config.enableDipBuying });
+                console.log(chalk.green(`✅ DIP buying ${!config.enableDipBuying ? 'enabled' : 'disabled'}`));
+                break;
+            case 'trailing':
+                this.tradingStrategy.updateConfig({ enableTrailingStop: !config.enableTrailingStop });
+                console.log(chalk.green(`✅ Trailing stop ${!config.enableTrailingStop ? 'enabled' : 'disabled'}`));
+                break;
+            case 'cancel':
+                return;
+            default:
+                console.log(chalk.red('❌ Invalid feature'));
+        }
+        
+        await this.sleep(1500);
+    }
+
+    // View Strategy Statistics
+    async viewStrategyStatistics() {
+        const stats = this.tradingStrategy.getStrategyStats();
+        
+        console.log(chalk.white('\n📈 STRATEGY STATISTICS'));
+        console.log(chalk.gray('═'.repeat(60)));
+        
+        console.log(chalk.cyan('\n📊 Overall Performance:'));
+        console.log(chalk.white(`   Status: ${stats.isRunning ? chalk.green('RUNNING') : chalk.red('STOPPED')}`));
+        console.log(chalk.white(`   Total Trades: ${stats.totalTrades}`));
+        console.log(chalk.white(`   Successful Trades: ${stats.successfulTrades}`));
+        console.log(chalk.white(`   Success Rate: ${stats.successRate.toFixed(1)}%`));
+        
+        console.log(chalk.cyan('\n💰 Profit & Loss:'));
+        const totalPnLColor = stats.totalPnL >= 0 ? chalk.green : chalk.red;
+        console.log(chalk.white(`   Realized P&L: ${stats.totalRealizedPnL.toFixed(4)} WLD`));
+        console.log(chalk.white(`   Unrealized P&L: ${stats.totalUnrealizedPnL.toFixed(4)} WLD`));
+        console.log(totalPnLColor(`   Total P&L: ${stats.totalPnL.toFixed(4)} WLD`));
+        
+        console.log(chalk.cyan('\n📊 Positions:'));
+        console.log(chalk.white(`   Total Positions: ${stats.totalPositions}`));
+        console.log(chalk.white(`   Open Positions: ${stats.openPositions}`));
+        console.log(chalk.white(`   Closed Positions: ${stats.closedPositions}`));
+        
+        console.log(chalk.cyan('\n⚙️ Current Configuration:'));
+        console.log(chalk.white(`   Profit Target: ${stats.config.profitTarget}%`));
+        console.log(chalk.white(`   Stop Loss: ${stats.config.stopLossThreshold}%`));
+        console.log(chalk.white(`   Max Slippage: ${stats.config.maxSlippage}%`));
+        console.log(chalk.white(`   DIP Threshold: ${stats.config.dipBuyThreshold}%`));
+        console.log(chalk.white(`   Max Position Size: ${stats.config.maxPositionSize} WLD`));
+        console.log(chalk.white(`   Max Open Positions: ${stats.config.maxOpenPositions}`));
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    // Close All Positions
+    async closeAllPositions() {
+        const openPositions = this.tradingStrategy.getAllPositions().filter(p => p.status === 'open');
+        
+        if (openPositions.length === 0) {
+            console.log(chalk.yellow('\n📭 No open positions to close'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        console.log(chalk.yellow(`\n⚠️ This will close ${openPositions.length} open positions`));
+        const confirm = await this.getUserInput('Are you sure? (yes/no): ');
+        
+        if (confirm.toLowerCase() === 'yes') {
+            try {
+                console.log(chalk.white('\n🔄 Closing all positions...'));
+                await this.tradingStrategy.closeAllPositions('manual_close_all');
+                console.log(chalk.green('\n✅ All positions closed successfully!'));
+            } catch (error) {
+                console.log(chalk.red(`❌ Error closing positions: ${error.message}`));
+            }
+        } else {
+            console.log(chalk.yellow('❌ Operation cancelled'));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
     async run() {
         while (true) {
             await this.displayMainMenu();
@@ -959,14 +1500,24 @@ class WorldchainTradingBot {
                     await this.tradingOperationsMenu();
                     break;
                 case '4':
-                    await this.configurationMenu();
+                    await this.strategyManagementMenu();
                     break;
                 case '5':
-                    await this.portfolioSummary();
+                    await this.configurationMenu();
                     break;
                 case '6':
+                    await this.portfolioSummary();
+                    break;
+                case '7':
                     console.log(chalk.green('\n👋 Thank you for using WorldChain Trading Bot!'));
                     console.log(chalk.yellow('💡 Remember to keep your private keys secure!'));
+                    
+                    // Stop strategy if running
+                    if (this.tradingStrategy.isRunning) {
+                        console.log(chalk.yellow('🛑 Stopping trading strategy...'));
+                        await this.tradingStrategy.stopStrategy();
+                    }
+                    
                     this.rl.close();
                     process.exit(0);
                     break;

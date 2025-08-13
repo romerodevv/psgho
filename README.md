@@ -25,6 +25,16 @@ An advanced, fully interactive trading bot for Worldchain with ATM-style interfa
 - **Price Monitoring**: Real-time price tracking and alerts
 - **Trade History**: Complete transaction history with details
 
+### 🎯 Advanced Trading Strategy
+- **Automated Position Tracking**: Records entry price and monitors P&L in real-time
+- **Profit Target System**: Automatically sells when target profit is reached (configurable %)
+- **DIP Buying**: Detects price dips and alerts for buying opportunities
+- **Stop Loss Protection**: Automatic selling when losses exceed threshold
+- **Trailing Stop**: Dynamic stop loss that follows profitable positions
+- **Price Discovery**: Uses swap quotes to determine current token prices
+- **Risk Management**: Configurable position sizes and maximum open positions
+- **Real-time Monitoring**: Price checks every 5 seconds (configurable)
+
 ### ⚙️ Configuration
 - **Trading Settings**: Configurable slippage tolerance and trading parameters
 - **Gas Configuration**: Customizable gas price and limits
@@ -89,12 +99,21 @@ node worldchain-trading-bot.js
    - Price monitoring
    - Trade history
 
-4. **⚙️ Configuration**
+4. **🎯 Strategy Management**
+   - Start/Stop automated strategy
+   - Execute strategic trades with position tracking
+   - View open and closed positions
+   - Configure profit targets and stop losses
+   - Real-time P&L monitoring
+   - DIP buying opportunities
+
+5. **⚙️ Configuration**
    - Trading settings
    - Gas configuration
    - Auto-discovery settings
+   - Strategy parameters
 
-5. **📊 Portfolio Overview**
+6. **📊 Portfolio Overview**
    - Complete portfolio summary
    - Total value calculation
    - Token distribution
@@ -164,11 +183,14 @@ The bot automatically discovers tokens by:
 
 ## 🎯 Use Cases
 
-- **DeFi Trading**: Automated DeFi token trading
+- **Strategic Trading**: Automated position tracking with profit targets
+- **DeFi Trading**: Automated DeFi token trading with WLD pairs
 - **Portfolio Management**: Multi-wallet portfolio tracking
 - **Token Discovery**: Automatic new token detection
 - **High-Frequency Trading**: Professional trading operations
 - **Yield Farming**: Automated yield optimization
+- **Risk Management**: Stop loss and trailing stop protection
+- **DIP Trading**: Automated detection of buying opportunities
 
 ## ⚠️ Disclaimers
 
@@ -214,14 +236,74 @@ For issues or questions:
 3. Test with small amounts first
 4. Review error messages carefully
 
+## 🎯 Strategy System Usage
+
+### Basic Strategy Workflow:
+
+1. **Setup**: Create wallets and discover/add tokens
+2. **Configure**: Set profit targets, stop losses, and risk parameters
+3. **Start Strategy**: Enable automated monitoring system
+4. **Execute Trades**: Open strategic positions that will be tracked
+5. **Monitor**: Watch real-time P&L and automatic trade execution
+
+### Strategy Features:
+
+#### 📊 **Position Tracking**
+- Records entry price when you swap WLD → Token
+- Continuously monitors current price via swap quotes
+- Calculates real-time P&L percentage
+- Tracks position duration and performance
+
+#### 🎯 **Automatic Profit Taking**
+- Set profit target (e.g., 1% gain)
+- Bot automatically sells Token → WLD when target is reached
+- Example: Buy 1 WLD → 325,613 ORO, sell when 1% profit achieved
+
+#### 📉 **DIP Buying**
+- Monitors price movements for buying opportunities
+- Alerts when token price drops by configured percentage
+- Example: If 1 WLD normally gets 325 ORO, alert when it gets 328+ ORO (1% dip)
+
+#### 🛑 **Risk Management**
+- Stop loss protection (e.g., -5% maximum loss)
+- Trailing stops for profitable positions
+- Maximum position size limits
+- Slippage protection (rejects trades >1% slippage)
+
+#### ⚡ **Real-time Monitoring**
+- Price checks every 5 seconds (configurable)
+- Uses actual swap quotes for price discovery
+- Automatic trade execution when conditions are met
+- Live P&L updates and notifications
+
+### Configuration Options:
+
+```bash
+# Strategy settings in .env file
+PROFIT_TARGET=1.0          # 1% profit target
+DIP_BUY_THRESHOLD=1.0      # Buy on 1% dip
+MAX_SLIPPAGE=1.0           # Max 1% slippage
+STOP_LOSS_THRESHOLD=-5.0   # 5% stop loss
+PRICE_CHECK_INTERVAL=5000  # 5 second monitoring
+```
+
 ## 🎉 Getting Started
 
-1. **Install** the dependencies
-2. **Run** the bot: `npm start`
-3. **Create** your first wallet
-4. **Add** some tokens or let auto-discovery find them
-5. **Start** trading with WLD pairs!
+1. **Install** the dependencies: `./start.sh install`
+2. **Configure** your strategy settings in `.env`
+3. **Run** the bot: `./start.sh start`
+4. **Create** your first wallet
+5. **Add** tokens or let auto-discovery find them
+6. **Start** the strategy system
+7. **Execute** strategic trades with automatic monitoring!
+
+### Example Trading Flow:
+
+1. **Open Position**: Trade 10 WLD → 3,256 ORO at 0.00307 WLD/ORO
+2. **Monitor**: Bot checks price every 5 seconds
+3. **Profit Target**: When 1 ORO = 0.00310 WLD (1% gain), auto-sell
+4. **Result**: Sell 3,256 ORO → 10.1 WLD (0.1 WLD profit)
 
 ---
 
-**Happy Trading on Worldchain! 🌍💰**
+**Happy Strategic Trading on Worldchain! 🌍💰🎯**
