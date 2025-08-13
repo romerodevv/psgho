@@ -1,0 +1,102 @@
+🌍 WorldChain Trading Bot - Cocoliso Premium Edition
+💎 Installation Instructions
+
+═══════════════════════════════════════════════════════════════
+
+🚀 QUICK INSTALL (3 Simple Steps):
+
+1. Download & Extract:
+   wget https://github.com/romerodevv/psgho/raw/main/worldchain-bot-cocoliso.tar.gz
+   tar -xzf worldchain-bot-cocoliso.tar.gz
+   cd worldchain-bot-cocoliso
+
+2. Install:
+   ./cocoliso-install.sh
+
+3. Start Trading:
+   ./start-cocoliso.sh
+
+═══════════════════════════════════════════════════════════════
+
+✅ WHAT YOU GET:
+
+• HoldStation SDK Integration - Native Worldchain DEX support
+• Sinclave Enhanced Trading - Proven patterns from sinclave.js  
+• 10 Professional Helper Scripts - Complete trading toolkit
+• Advanced Portfolio Management - Multi-wallet support
+• MEV Protection - Sandwich attack prevention
+• Gas Optimization - Cost-effective transactions
+• Automatic Backup System - Data protection
+• Real-time Market Scanner - Opportunity detection
+• Professional Analytics - Performance metrics
+• Multi-DEX Support - HoldStation, ZeroX, HoldSo
+
+═══════════════════════════════════════════════════════════════
+
+🛠️ HELPER SCRIPTS INCLUDED:
+
+• start-cocoliso.sh - Launch the premium bot
+• test-cocoliso.sh - Run premium test suite  
+• wallet-manager.sh - Premium wallet management
+• trading-analyzer.sh - Advanced trading analysis
+• portfolio-tracker.sh - Portfolio monitoring
+• strategy-optimizer.sh - Strategy optimization
+• market-scanner.sh - Market scanning tools
+• backup-manager.sh - Backup management
+• update-cocoliso.sh - Automatic updates
+• uninstall-cocoliso.sh - Clean uninstaller
+
+═══════════════════════════════════════════════════════════════
+
+🎯 VERIFIED TRADING PAIRS:
+
+✅ WLD/ORO - Primary trading pair (WORKING)
+✅ WLD/Custom Token (0x1a16f733b813a59815a76293dac835ad1c7fedff) - WORKING  
+✅ Exchange Rate: 1 WLD = 375.514774 tokens
+✅ HoldStation SDK Integration: CONFIRMED WORKING
+
+═══════════════════════════════════════════════════════════════
+
+🔧 REQUIREMENTS:
+
+• Node.js v18+ (auto-installed if missing)
+• Linux/macOS/Windows (WSL)
+• 2GB+ RAM
+• Stable internet connection
+
+═══════════════════════════════════════════════════════════════
+
+💡 AFTER INSTALLATION:
+
+1. Edit configuration:
+   nano .env
+
+2. Run tests to verify:
+   ./test-cocoliso.sh
+
+3. Start trading:
+   ./start-cocoliso.sh
+
+4. Access premium features:
+   ls -la *.sh
+
+═══════════════════════════════════════════════════════════════
+
+🆘 SUPPORT:
+
+• Documentation: COCOLISO_INSTALL_GUIDE.md
+• HoldStation Guide: HOLDSTATION_SDK_GUIDE.md  
+• Issues: GitHub repository
+• Community: WorldChain trading groups
+
+═══════════════════════════════════════════════════════════════
+
+🎉 WELCOME TO COCOLISO PREMIUM!
+
+Professional Trading Made Simple
+Enterprise Features for Everyone
+Your Gateway to Profitable DeFi Trading
+
+Cocoliso Premium - Where Innovation Meets Profitability 🌟
+
+═══════════════════════════════════════════════════════════════
