@@ -721,8 +721,8 @@ class WorldchainTradingBot {
             await this.displayHeader();
             console.log(chalk.white('\n📈 TRADING OPERATIONS'));
             console.log(chalk.gray('─'.repeat(30)));
-            console.log(chalk.cyan('1. 🔄 Execute Trade'));
-            console.log(chalk.cyan('2. 🚀 Sinclave Enhanced Trade'));
+            console.log(chalk.green('1. 🚀 Sinclave Enhanced Trade (Default)'));
+            console.log(chalk.cyan('2. 🔄 Standard Trade'));
             console.log(chalk.cyan('3. 📊 View Trading Pairs'));
             console.log(chalk.cyan('4. 🔍 Check Pair Liquidity'));
             console.log(chalk.cyan('5. 💡 Suggest Valid Trading Pairs'));
@@ -731,14 +731,14 @@ class WorldchainTradingBot {
             console.log(chalk.cyan('8. 📋 Trade History'));
             console.log(chalk.red('9. ⬅️  Back to Main Menu'));
             
-            const choice = await this.getUserInput('\nSelect option: ');
+            const choice = await this.getUserInput('\nSelect option (Enter for Enhanced Trade): ');
             
-            switch (choice) {
+            switch (choice || '1') { // Default to Enhanced Trade if Enter is pressed
                 case '1':
-                    await this.executeTrade();
+                    await this.sinclaveEnhancedTrade();
                     break;
                 case '2':
-                    await this.sinclaveEnhancedTrade();
+                    await this.executeTrade();
                     break;
                 case '3':
                     await this.viewTradingPairs();
@@ -1120,25 +1120,46 @@ class WorldchainTradingBot {
                 console.log(chalk.white(`💰 Amount: ${amount}`));
                 console.log(chalk.white(`📈 Direction: ${direction === '1' ? 'BUY' : 'SELL'}`));
                 console.log(chalk.white(`⛽ Gas Used: ${result.gasUsed || 'N/A'}`));
-                console.log(chalk.white(`🧾 Transaction Hash: ${result.txHash || 'N/A'}`));
+                console.log(chalk.white(`🧾 Transaction Hash: ${result.transactionHash || result.txHash || 'N/A'}`));
                 console.log(chalk.white(`⚡ Execution Time: ${result.executionTime}ms`));
-                console.log(chalk.white(`📊 Exchange Rate: ${result.exchangeRate ? result.exchangeRate.toFixed(6) : 'N/A'}`));
-                console.log(chalk.white(`🔗 WorldScan: https://worldscan.org/tx/${result.txHash}`));
                 
-                if (result.optimizations) {
-                    console.log(chalk.cyan('\n✨ OPTIMIZATIONS APPLIED:'));
-                    console.log(chalk.cyan(`   🌐 Public RPC Used: ${result.optimizations.publicRPCUsed ? '✅' : '❌'}`));
-                    console.log(chalk.cyan(`   🔧 Routing Fix Applied: ${result.optimizations.routingFixApplied ? '✅' : '❌'}`));
-                    console.log(chalk.cyan(`   ⛽ Gas Optimized: ${result.optimizations.gasOptimized ? '✅' : '❌'}`));
-                    console.log(chalk.cyan(`   🚀 SDK Used: ${result.optimizations.sdkUsed}`));
+                // Calculate and display exchange rate
+                if (result.tokensSpent && result.tokensReceived) {
+                    const spent = parseFloat(result.tokensSpent);
+                    const received = parseFloat(result.tokensReceived);
+                    if (spent > 0) {
+                        const rate = received / spent;
+                        console.log(chalk.white(`📊 Exchange Rate: ${rate.toFixed(6)}`));
+                    }
                 }
                 
-                // Show performance metrics
+                console.log(chalk.white(`🔗 WorldScan: https://worldscan.org/tx/${result.transactionHash || result.txHash}`));
+                
+                // Show optimizations applied (ENHANCED)
+                console.log(chalk.cyan('\n✨ OPTIMIZATIONS APPLIED:'));
+                const optimizations = this.sinclaveEngine.getOptimizationStatus();
+                optimizations.optimizationsActive.forEach(opt => {
+                    console.log(chalk.cyan(`   ${opt}`));
+                });
+                
+                // Show performance metrics (ENHANCED)
                 const metrics = this.sinclaveEngine.getMetrics();
                 console.log(chalk.blue('\n📊 PERFORMANCE METRICS:'));
                 console.log(chalk.blue(`   📈 Success Rate: ${metrics.successRate}`));
                 console.log(chalk.blue(`   ⚡ Average Execution: ${metrics.averageExecutionTime}`));
                 console.log(chalk.blue(`   🔢 Total Trades: ${metrics.totalTrades}`));
+                console.log(chalk.blue(`   💾 SDK Cache: ${metrics.sdkCacheHits}`));
+                console.log(chalk.blue(`   🌐 Provider Cache: ${metrics.providerCacheHits}`));
+                
+                // Performance improvement notice
+                if (result.executionTime < 5000) {
+                    console.log(chalk.green('\n🚀 PERFORMANCE: Excellent execution time! (<5s)'));
+                } else if (result.executionTime < 8000) {
+                    console.log(chalk.yellow('\n⚡ PERFORMANCE: Good execution time (<8s)'));
+                } else {
+                    console.log(chalk.red('\n⏳ PERFORMANCE: Execution time could be improved'));
+                    console.log(chalk.yellow('💡 Try running another trade to benefit from caching optimizations'));
+                }
                 
             } else {
                 throw new Error(result.error || 'Trade execution returned invalid result');
