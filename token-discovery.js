@@ -189,7 +189,7 @@ class TokenDiscoveryService {
                 return [];
             }
 
-            const alchemyUrl = `https://eth-mainnet.g.alchemy.com/v2/${this.ALCHEMY_API_KEY}`;
+            const alchemyUrl = `https://worldchain-mainnet.g.alchemy.com/v2/${this.ALCHEMY_API_KEY}`;
             
             // Get token balances
             const response = await axios.post(alchemyUrl, {

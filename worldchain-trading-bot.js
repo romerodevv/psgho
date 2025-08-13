@@ -413,16 +413,12 @@ class WorldchainTradingBot {
     async getAlchemyPortfolioBalances(walletAddress) {
         try {
             const axios = require('axios');
-            const apiKey = process.env.ALCHEMY_API_KEY;
-            const baseURL = `https://worldchain-mainnet.g.alchemy.com/v2/${apiKey}`;
             
-            // Get native balance (ETH)
-            const nativeResponse = await axios.post(baseURL, {
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'alchemy_getTokenBalances',
-                params: [walletAddress, 'DEFAULT_TOKENS']
-            });
+            // First try with API key if available
+            let baseURL = 'https://worldchain-mainnet.g.alchemy.com/public';
+            if (process.env.ALCHEMY_API_KEY && process.env.ALCHEMY_API_KEY !== 'demo') {
+                baseURL = `https://worldchain-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
+            }
             
             // Get ETH balance
             const ethResponse = await axios.post(baseURL, {
@@ -434,46 +430,34 @@ class WorldchainTradingBot {
             
             const ethBalance = ethers.formatEther(ethResponse.data.result || '0');
             
-            // Parse token balances
+            // Use token discovery service for comprehensive token detection
+            console.log(chalk.gray('      🔍 Discovering tokens...'));
+            const discoveredTokens = await this.tokenDiscovery.discoverTokensInWallet(walletAddress, {
+                includeZeroBalances: false,
+                maxTokens: 20
+            });
+            
             let wldBalance = '0';
             const tokens = [];
             
-            if (nativeResponse.data.result && nativeResponse.data.result.tokenBalances) {
-                for (const tokenData of nativeResponse.data.result.tokenBalances) {
-                    if (tokenData.contractAddress.toLowerCase() === this.WLD_ADDRESS.toLowerCase()) {
-                        wldBalance = ethers.formatUnits(tokenData.tokenBalance || '0', 18);
-                    } else if (tokenData.tokenBalance && tokenData.tokenBalance !== '0x0') {
-                        // Get token metadata
-                        try {
-                            const metadataResponse = await axios.post(baseURL, {
-                                jsonrpc: '2.0',
-                                id: 3,
-                                method: 'alchemy_getTokenMetadata',
-                                params: [tokenData.contractAddress]
-                            });
-                            
-                            const metadata = metadataResponse.data.result;
-                            if (metadata) {
-                                const balance = ethers.formatUnits(tokenData.tokenBalance, metadata.decimals || 18);
-                                if (parseFloat(balance) > 0) {
-                                    tokens.push({
-                                        symbol: metadata.symbol || 'Unknown',
-                                        balance: parseFloat(balance).toFixed(4),
-                                        address: tokenData.contractAddress
-                                    });
-                                }
-                            }
-                        } catch (metaError) {
-                            // Skip tokens we can't get metadata for
-                        }
-                    }
+            // Process discovered tokens
+            for (const token of discoveredTokens) {
+                if (token.address.toLowerCase() === this.WLD_ADDRESS.toLowerCase()) {
+                    wldBalance = token.balance;
+                } else {
+                    tokens.push({
+                        symbol: token.symbol,
+                        balance: parseFloat(token.balance).toFixed(6),
+                        address: token.address,
+                        name: token.name
+                    });
                 }
             }
             
             return {
                 success: true,
                 ethBalance: parseFloat(ethBalance).toFixed(8),
-                wldBalance: parseFloat(wldBalance).toFixed(4),
+                wldBalance: parseFloat(wldBalance).toFixed(6),
                 tokens: tokens
             };
         } catch (error) {
@@ -550,28 +534,42 @@ class WorldchainTradingBot {
         console.log(chalk.white('\n🔍 DISCOVERING TOKENS...'));
         console.log(chalk.gray('═'.repeat(50)));
         
+        let totalDiscovered = 0;
+        let activeTokens = 0;
+        
         for (const wallet of this.wallets) {
             console.log(chalk.cyan(`\nScanning ${wallet.name}...`));
+            console.log(chalk.white(`📍 ${wallet.address}`));
             
             try {
-                // This would typically use a service like Moralis or Alchemy
-                // For demo purposes, we'll simulate token discovery
+                // Use the advanced token discovery service
                 const tokens = await this.scanWalletForTokens(wallet.address);
                 
                 wallet.tokens = tokens;
                 
                 // Add to global discovered tokens
                 for (const token of tokens) {
+                    const balance = parseFloat(token.balance || '0');
+                    
                     if (!this.discoveredTokens[token.address]) {
                         this.discoveredTokens[token.address] = {
                             ...token,
                             discoveredAt: new Date().toISOString(),
                             tradingPair: `WLD-${token.symbol}`
                         };
+                        totalDiscovered++;
+                    } else {
+                        // Update existing token with latest balance
+                        this.discoveredTokens[token.address].balance = token.balance;
+                    }
+                    
+                    if (balance > 0) {
+                        activeTokens++;
+                        console.log(chalk.green(`  🪙 ${token.symbol}: ${balance.toFixed(6)}`));
                     }
                 }
                 
-                console.log(chalk.green(`  ✅ Found ${tokens.length} tokens`));
+                console.log(chalk.green(`  ✅ Found ${tokens.length} tokens (${tokens.filter(t => parseFloat(t.balance || '0') > 0).length} with balance)`));
                 
             } catch (error) {
                 console.log(chalk.red(`  ❌ Error scanning wallet: ${error.message}`));
@@ -581,7 +579,12 @@ class WorldchainTradingBot {
         this.saveWallets();
         this.saveDiscoveredTokens();
         
-        console.log(chalk.green('\n✅ Token discovery completed!'));
+        console.log(chalk.white('\n═'.repeat(50)));
+        console.log(chalk.green('✅ Token discovery completed!'));
+        console.log(chalk.green(`🪙 Active tokens (with balance): ${activeTokens}`));
+        console.log(chalk.blue(`🔍 New tokens discovered: ${totalDiscovered}`));
+        console.log(chalk.white(`📊 Total tokens in portfolio: ${Object.keys(this.discoveredTokens).length}`));
+        
         await this.getUserInput('\nPress Enter to continue...');
     }
 
@@ -669,6 +672,7 @@ class WorldchainTradingBot {
         
         if (tokens.length === 0) {
             console.log(chalk.yellow('\n📭 No tokens discovered yet!'));
+            console.log(chalk.white('💡 Run "Discover Tokens in Wallets" first to find all your tokens.'));
             await this.getUserInput('\nPress Enter to continue...');
             return;
         }
@@ -676,15 +680,36 @@ class WorldchainTradingBot {
         console.log(chalk.white('\n📋 DISCOVERED TOKENS'));
         console.log(chalk.gray('═'.repeat(80)));
         
+        let activeTokens = 0;
+        let totalValue = 0;
+        
         tokens.forEach((token, index) => {
             console.log(chalk.cyan(`\n${index + 1}. ${token.name} (${token.symbol})`));
             console.log(chalk.white(`   📍 Address: ${token.address}`));
             console.log(chalk.white(`   📈 Trading Pair: ${token.tradingPair}`));
+            
+            // Show balance if available
+            if (token.balance && parseFloat(token.balance) > 0) {
+                console.log(chalk.green(`   💰 Balance: ${parseFloat(token.balance).toFixed(6)} ${token.symbol}`));
+                activeTokens++;
+            } else {
+                console.log(chalk.gray(`   💰 Balance: 0 ${token.symbol}`));
+            }
+            
             console.log(chalk.white(`   📅 Discovered: ${new Date(token.discoveredAt).toLocaleDateString()}`));
+            
             if (token.manuallyAdded) {
                 console.log(chalk.yellow('   ✋ Manually Added'));
             }
+            
+            if (token.discoveryMethod) {
+                console.log(chalk.blue(`   🔍 Method: ${token.discoveryMethod}`));
+            }
         });
+        
+        console.log(chalk.white(`\n📊 Portfolio Summary:`));
+        console.log(chalk.green(`   ✅ Active tokens (with balance): ${activeTokens}`));
+        console.log(chalk.gray(`   📋 Total discovered: ${tokens.length}`));
         
         await this.getUserInput('\nPress Enter to continue...');
     }
