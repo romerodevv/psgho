@@ -169,6 +169,11 @@ class TradingStrategy extends EventEmitter {
             }
             
             // Create position record (works with both engines)
+            // Calculate the ACTUAL executed swap rate from the trade results
+            const actualTokensReceived = parseFloat(result.amountOut || result.tokensReceived || 0);
+            const actualWLDSpent = parseFloat(amountWLD);
+            const executedRate = actualTokensReceived / actualWLDSpent; // tokens per WLD
+            
             const calculatedPrice = currentPrice || (result.tokensReceived && result.tokensSpent ? 
                 parseFloat(result.tokensSpent) / parseFloat(result.tokensReceived) : 0);
             
@@ -178,34 +183,47 @@ class TradingStrategy extends EventEmitter {
                 walletAddress: wallet.address,
                 status: 'open',
                 
-                // Entry data
-                entryPrice: calculatedPrice,
-                entryAmountWLD: parseFloat(amountWLD),
-                entryAmountToken: parseFloat(result.amountOut || result.tokensReceived || 0),
+                // Entry data (CRITICAL: Record actual executed swap)
+                entryAmountWLD: actualWLDSpent, // WLD we spent
+                entryAmountToken: actualTokensReceived, // Tokens we received
+                executedRate: executedRate, // Actual rate: tokens per WLD
                 entryTimestamp: Date.now(),
                 entryTxHash: result.txHash || result.transactionHash,
                 
+                // For profit calculation: We need 1% more WLD back than we spent
+                // If we spent 0.1 WLD, we need 0.101 WLD back to achieve 1% profit
+                profitTargetWLD: actualWLDSpent * (1 + this.strategyConfig.profitTarget / 100),
+                stopLossWLD: actualWLDSpent * (1 + this.strategyConfig.stopLossThreshold / 100),
+                
                 // Current data (updated by monitoring)
-                currentPrice: calculatedPrice,
-                currentValue: parseFloat(amountWLD), // Current value in WLD
-                unrealizedPnL: 0,
+                currentWLDValue: actualWLDSpent, // Initially equal to what we spent
+                currentValue: actualWLDSpent, // For compatibility
+                unrealizedPnL: 0, // No profit/loss initially
                 unrealizedPnLPercent: 0,
+                canExecuteReverseSwap: false, // Will be updated by monitoring
                 
                 // Strategy data
                 profitTarget: this.strategyConfig.profitTarget,
                 stopLoss: this.strategyConfig.stopLossThreshold,
-                highestPrice: calculatedPrice, // For trailing stop
+                highestWLDValue: actualWLDSpent, // Track highest WLD value for trailing stop
+                trailingStopWLDValue: null,
+                
+                // Legacy compatibility
+                entryPrice: calculatedPrice,
+                currentPrice: calculatedPrice,
+                highestPrice: calculatedPrice,
                 trailingStopPrice: null,
                 
                 // Trade history
                 trades: [{
                     type: 'buy',
                     timestamp: Date.now(),
-                    price: calculatedPrice,
-                    amountWLD: parseFloat(amountWLD),
-                    amountToken: parseFloat(result.amountOut || result.tokensReceived || 0),
+                    amountWLD: actualWLDSpent,
+                    amountToken: actualTokensReceived,
+                    executedRate: executedRate,
                     txHash: result.txHash || result.transactionHash,
-                    gasUsed: result.gasUsed || 'N/A'
+                    gasUsed: result.gasUsed || 'N/A',
+                    price: calculatedPrice // Legacy compatibility
                 }]
             };
             
@@ -220,9 +238,11 @@ class TradingStrategy extends EventEmitter {
             this.totalTrades++;
             
             console.log(`✅ Position opened: ${position.id}`);
-            const tokensReceived = result.amountOut || result.tokensReceived || 'Unknown';
-            const priceDisplay = calculatedPrice > 0 ? calculatedPrice.toFixed(8) : 'Unknown';
-            console.log(`📊 Entry: ${amountWLD} WLD -> ${tokensReceived} tokens at ${priceDisplay} WLD/token`);
+            console.log(`📊 Entry: ${actualWLDSpent} WLD → ${actualTokensReceived} tokens`);
+            console.log(`📊 Executed Rate: 1 WLD = ${executedRate.toFixed(6)} tokens`);
+            console.log(`🎯 Profit Target: ${position.profitTargetWLD.toFixed(6)} WLD (${this.strategyConfig.profitTarget}% profit)`);
+            console.log(`🛑 Stop Loss: ${position.stopLossWLD.toFixed(6)} WLD (${this.strategyConfig.stopLossThreshold}% loss)`);
+            console.log(`📊 Monitoring will check reverse swap quotes every ${this.strategyConfig.priceCheckInterval/1000}s`);
             
             this.emit('positionOpened', position);
             return position;
@@ -371,7 +391,7 @@ class TradingStrategy extends EventEmitter {
         }
     }
 
-    // Monitor a single position
+    // Monitor a single position (ENHANCED WITH REVERSE SWAP QUOTES)
     async monitorPosition(tokenAddress) {
         const position = this.positions.get(tokenAddress);
         if (!position || position.status !== 'open') {
@@ -380,62 +400,139 @@ class TradingStrategy extends EventEmitter {
         }
         
         try {
-            // Get current price by simulating a sell quote
-            const currentPrice = await this.getCurrentTokenPrice(tokenAddress);
+            // CRITICAL: Use reverse swap quotes to check actual sellable value
+            // This tells us exactly how much WLD we'd get back for our tokens
+            let currentWLDValue = 0;
+            let canExecuteReverseSwap = false;
             
-            // Calculate current position value
-            const currentValue = position.entryAmountToken * currentPrice;
-            const unrealizedPnL = currentValue - position.entryAmountWLD;
-            const unrealizedPnLPercent = (unrealizedPnL / position.entryAmountWLD) * 100;
-            
-            // Update position data
-            position.currentPrice = currentPrice;
-            position.currentValue = currentValue;
-            position.unrealizedPnL = unrealizedPnL;
-            position.unrealizedPnLPercent = unrealizedPnLPercent;
-            
-            // Update highest price for trailing stop
-            if (currentPrice > position.highestPrice) {
-                position.highestPrice = currentPrice;
-                
-                // Update trailing stop price if enabled and profitable enough
-                if (this.strategyConfig.enableTrailingStop && 
-                    unrealizedPnLPercent >= this.strategyConfig.minProfitForTrailing) {
-                    const trailingStopPercent = this.strategyConfig.trailingStop / 100;
-                    position.trailingStopPrice = currentPrice * (1 - trailingStopPercent);
+            if (this.sinclaveEngine) {
+                try {
+                    // Get reverse swap quote: TOKEN → WLD
+                    const reverseQuote = await this.sinclaveEngine.getHoldStationQuote(
+                        tokenAddress,
+                        this.WLD_ADDRESS,
+                        position.entryAmountToken, // All our tokens
+                        position.walletAddress
+                    );
+                    
+                    if (reverseQuote && reverseQuote.expectedOutput) {
+                        currentWLDValue = parseFloat(reverseQuote.expectedOutput);
+                        canExecuteReverseSwap = true;
+                        console.log(`📊 Position ${position.id}: ${position.entryAmountToken} tokens → ${currentWLDValue.toFixed(6)} WLD`);
+                    }
+                } catch (enhancedError) {
+                    console.log(`⚠️ Enhanced reverse quote failed: ${enhancedError.message}`);
+                    // Fall back to standard price calculation
                 }
             }
             
-            // Store price in history
+            // Fallback: Use current price calculation if reverse quote fails
+            if (!canExecuteReverseSwap) {
+                const currentPrice = await this.getCurrentTokenPrice(tokenAddress);
+                currentWLDValue = position.entryAmountToken * currentPrice;
+                console.log(`📊 Position ${position.id}: Estimated value ${currentWLDValue.toFixed(6)} WLD (price-based)`);
+            }
+            
+            // Calculate P&L based on actual swap values
+            // Initial: position.entryAmountWLD WLD → position.entryAmountToken tokens
+            // Current: position.entryAmountToken tokens → currentWLDValue WLD
+            const unrealizedPnL = currentWLDValue - position.entryAmountWLD;
+            const unrealizedPnLPercent = (unrealizedPnL / position.entryAmountWLD) * 100;
+            
+            // Update position data
+            position.currentWLDValue = currentWLDValue; // How much WLD we'd get back
+            position.currentValue = currentWLDValue; // For compatibility
+            position.unrealizedPnL = unrealizedPnL;
+            position.unrealizedPnLPercent = unrealizedPnLPercent;
+            position.canExecuteReverseSwap = canExecuteReverseSwap;
+            
+            // Store in history with swap-based data
             if (!this.priceHistory.has(tokenAddress)) {
                 this.priceHistory.set(tokenAddress, []);
             }
             const history = this.priceHistory.get(tokenAddress);
             history.push({
                 timestamp: Date.now(),
-                price: currentPrice,
-                value: currentValue,
-                pnlPercent: unrealizedPnLPercent
+                wldValue: currentWLDValue, // Actual WLD we'd get back
+                pnl: unrealizedPnL,
+                pnlPercent: unrealizedPnLPercent,
+                canExecuteSwap: canExecuteReverseSwap
             });
             
-            // Keep only last 1000 price points
-            if (history.length > 1000) {
-                history.splice(0, history.length - 1000);
+            // Keep only last 100 history entries
+            if (history.length > 100) {
+                history.shift();
             }
             
-            // Check trading conditions
-            await this.checkTradingConditions(tokenAddress, position);
+            // Check for profit target (using actual swap quotes)
+            if (unrealizedPnLPercent >= position.profitTarget) {
+                console.log(`🎯 PROFIT TARGET REACHED! ${unrealizedPnLPercent.toFixed(2)}% >= ${position.profitTarget}%`);
+                console.log(`💰 Expected return: ${currentWLDValue.toFixed(6)} WLD (profit: ${unrealizedPnL.toFixed(6)} WLD)`);
+                
+                if (canExecuteReverseSwap) {
+                    console.log(`🚀 Executing profitable reverse swap...`);
+                    await this.executeSellTrade(tokenAddress, 'profit_target');
+                } else {
+                    console.log(`⚠️ Cannot execute reverse swap, monitoring continues...`);
+                }
+                return;
+            }
             
-            // Emit price update event
-            this.emit('priceUpdate', {
-                tokenAddress,
-                position,
-                currentPrice,
-                unrealizedPnLPercent
-            });
+            // Check for stop loss
+            if (unrealizedPnLPercent <= position.stopLoss) {
+                console.log(`🛑 STOP LOSS TRIGGERED! ${unrealizedPnLPercent.toFixed(2)}% <= ${position.stopLoss}%`);
+                console.log(`💸 Expected return: ${currentWLDValue.toFixed(6)} WLD (loss: ${Math.abs(unrealizedPnL).toFixed(6)} WLD)`);
+                
+                if (canExecuteReverseSwap) {
+                    console.log(`🚨 Executing stop loss reverse swap...`);
+                    await this.executeSellTrade(tokenAddress, 'stop_loss');
+                } else {
+                    console.log(`⚠️ Cannot execute reverse swap, monitoring continues...`);
+                }
+                return;
+            }
+            
+            // Update trailing stop logic (using swap-based values)
+            if (currentWLDValue > (position.highestWLDValue || position.entryAmountWLD)) {
+                position.highestWLDValue = currentWLDValue;
+                
+                // Update trailing stop if enabled and profitable enough
+                if (this.strategyConfig.enableTrailingStop && 
+                    unrealizedPnLPercent >= this.strategyConfig.minProfitForTrailing) {
+                    const trailingStopPercent = this.strategyConfig.trailingStop / 100;
+                    position.trailingStopWLDValue = currentWLDValue * (1 - trailingStopPercent);
+                    console.log(`📈 New trailing stop: ${position.trailingStopWLDValue.toFixed(6)} WLD`);
+                }
+            }
+            
+            // Check trailing stop
+            if (position.trailingStopWLDValue && currentWLDValue <= position.trailingStopWLDValue) {
+                console.log(`📉 TRAILING STOP TRIGGERED! ${currentWLDValue.toFixed(6)} <= ${position.trailingStopWLDValue.toFixed(6)} WLD`);
+                
+                if (canExecuteReverseSwap) {
+                    console.log(`🔄 Executing trailing stop reverse swap...`);
+                    await this.executeSellTrade(tokenAddress, 'trailing_stop');
+                } else {
+                    console.log(`⚠️ Cannot execute reverse swap, monitoring continues...`);
+                }
+                return;
+            }
+            
+            // Periodic status update (every 10 checks, roughly 50 seconds)
+            const historyLength = history.length;
+            if (historyLength % 10 === 0) {
+                console.log(`📊 Position ${position.id} status:`);
+                console.log(`   💰 Entry: ${position.entryAmountWLD} WLD → ${position.entryAmountToken} tokens`);
+                console.log(`   📈 Current: ${position.entryAmountToken} tokens → ${currentWLDValue.toFixed(6)} WLD`);
+                console.log(`   📊 P&L: ${unrealizedPnL.toFixed(6)} WLD (${unrealizedPnLPercent.toFixed(2)}%)`);
+                console.log(`   🎯 Target: ${position.profitTarget}% | 🛑 Stop: ${position.stopLoss}%`);
+                console.log(`   🔄 Swap Available: ${canExecuteReverseSwap ? '✅' : '❌'}`);
+            }
+            
+            await this.savePositions();
             
         } catch (error) {
-            console.error(`❌ Error monitoring ${tokenAddress}:`, error.message);
+            console.error(`❌ Error monitoring position ${tokenAddress}:`, error.message);
         }
     }
 
