@@ -25,7 +25,7 @@ class TokenDiscoveryService {
         
         // Common token addresses on Worldchain
         this.KNOWN_TOKENS = {
-            'WLD': '0x163f8c2467924be0ae7b5347228cabf260318753',
+            'WLD': '0x2cfc85d8e48f8eab294be644d9e25c3030863003',
             'WETH': '0x4200000000000000000000000000000000000006',
             'USDC': '0x79A02482A880bCE3F13e09Da970dC34db4CD24d1'
         };

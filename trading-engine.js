@@ -12,7 +12,7 @@ class AdvancedTradingEngine {
         this.QUOTER_V2 = '0x61fFE014bA17989E743c5F6cB21bF9697530B21e';
         
         // WLD token on Worldchain
-        this.WLD_ADDRESS = '0x163f8c2467924be0ae7b5347228cabf260318753';
+        this.WLD_ADDRESS = '0x2cfc85d8e48f8eab294be644d9e25c3030863003';
         
         // ABI definitions
         this.ROUTER_ABI = [

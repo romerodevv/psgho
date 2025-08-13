@@ -47,8 +47,8 @@ class WorldchainTradingBot {
         // Setup strategy event listeners
         this.setupStrategyEventListeners();
         
-        // WLD token address on Worldchain
-        this.WLD_ADDRESS = '0x163f8c2467924be0ae7b5347228cabf260318753';
+        // WLD token address on Worldchain (correct address)
+        this.WLD_ADDRESS = '0x2cfc85d8e48f8eab294be644d9e25c3030863003';
         
         // DEX router addresses for Worldchain (using Uniswap V3 compatible)
         this.ROUTER_ADDRESS = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
@@ -306,20 +306,47 @@ class WorldchainTradingBot {
         for (let i = 0; i < this.wallets.length; i++) {
             const wallet = this.wallets[i];
             try {
-                const balance = await this.provider.getBalance(wallet.address);
-                const ethBalance = ethers.formatEther(balance);
-                wallet.balance = ethBalance;
-                
                 console.log(chalk.cyan(`\n${wallet.name}:`));
                 console.log(chalk.white(`  📍 ${wallet.address}`));
-                console.log(chalk.green(`  💰 ${ethBalance} ETH`));
                 
-                // Get WLD balance
-                const wldBalance = await this.getTokenBalance(wallet.address, this.WLD_ADDRESS);
-                console.log(chalk.yellow(`  🌍 ${wldBalance} WLD`));
+                // Try Alchemy Portfolio API first for accurate balances
+                const portfolioData = await this.getPortfolioBalances(wallet.address);
+                
+                if (portfolioData.success) {
+                    console.log(chalk.green(`  💰 ${portfolioData.ethBalance} ETH`));
+                    console.log(chalk.yellow(`  🌍 ${portfolioData.wldBalance} WLD`));
+                    
+                    wallet.balance = portfolioData.ethBalance;
+                    wallet.wldBalance = portfolioData.wldBalance;
+                    
+                    // Show other tokens if any
+                    if (portfolioData.tokens && portfolioData.tokens.length > 0) {
+                        console.log(chalk.white(`  🪙 Other Tokens:`));
+                        portfolioData.tokens.slice(0, 5).forEach(token => {
+                            console.log(chalk.gray(`     • ${token.balance} ${token.symbol}`));
+                        });
+                        if (portfolioData.tokens.length > 5) {
+                            console.log(chalk.gray(`     ... and ${portfolioData.tokens.length - 5} more`));
+                        }
+                    }
+                } else {
+                    // Fallback to direct RPC calls
+                    console.log(chalk.gray(`  📡 Using direct RPC calls...`));
+                    const balance = await this.provider.getBalance(wallet.address);
+                    const ethBalance = ethers.formatEther(balance);
+                    wallet.balance = ethBalance;
+                    
+                    console.log(chalk.green(`  💰 ${ethBalance} ETH`));
+                    
+                    // Get WLD balance with retry logic
+                    const wldBalance = await this.getTokenBalanceWithRetry(wallet.address, this.WLD_ADDRESS);
+                    console.log(chalk.yellow(`  🌍 ${wldBalance} WLD`));
+                    wallet.wldBalance = wldBalance;
+                }
                 
             } catch (error) {
                 console.log(chalk.red(`  ❌ Error fetching balance: ${error.message}`));
+                console.log(chalk.gray(`     Please check your network connection and try again.`));
             }
         }
         
@@ -338,6 +365,139 @@ class WorldchainTradingBot {
             return ethers.formatUnits(balance, decimals);
         } catch (error) {
             return '0';
+        }
+    }
+
+    async getTokenBalanceWithRetry(walletAddress, tokenAddress, maxRetries = 3) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const abi = [
+                    'function balanceOf(address owner) view returns (uint256)', 
+                    'function decimals() view returns (uint8)',
+                    'function symbol() view returns (string)'
+                ];
+                const contract = new ethers.Contract(tokenAddress, abi, this.provider);
+                
+                const [balance, decimals] = await Promise.all([
+                    contract.balanceOf(walletAddress),
+                    contract.decimals()
+                ]);
+                
+                return ethers.formatUnits(balance, decimals);
+            } catch (error) {
+                if (attempt === maxRetries) {
+                    console.log(chalk.gray(`     ⚠️ Failed to fetch token balance after ${maxRetries} attempts`));
+                    return '0';
+                }
+                await this.sleep(1000 * attempt); // Exponential backoff
+            }
+        }
+        return '0';
+    }
+
+    async getPortfolioBalances(walletAddress) {
+        try {
+            // Try Alchemy Portfolio API if API key is available
+            if (process.env.ALCHEMY_API_KEY && process.env.ALCHEMY_API_KEY !== 'demo') {
+                return await this.getAlchemyPortfolioBalances(walletAddress);
+            }
+            
+            // Fallback to direct contract calls
+            return await this.getDirectPortfolioBalances(walletAddress);
+        } catch (error) {
+            console.log(chalk.gray(`     Portfolio API error: ${error.message}`));
+            return { success: false };
+        }
+    }
+
+    async getAlchemyPortfolioBalances(walletAddress) {
+        try {
+            const axios = require('axios');
+            const apiKey = process.env.ALCHEMY_API_KEY;
+            const baseURL = `https://worldchain-mainnet.g.alchemy.com/v2/${apiKey}`;
+            
+            // Get native balance (ETH)
+            const nativeResponse = await axios.post(baseURL, {
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'alchemy_getTokenBalances',
+                params: [walletAddress, 'DEFAULT_TOKENS']
+            });
+            
+            // Get ETH balance
+            const ethResponse = await axios.post(baseURL, {
+                jsonrpc: '2.0',
+                id: 2,
+                method: 'eth_getBalance',
+                params: [walletAddress, 'latest']
+            });
+            
+            const ethBalance = ethers.formatEther(ethResponse.data.result || '0');
+            
+            // Parse token balances
+            let wldBalance = '0';
+            const tokens = [];
+            
+            if (nativeResponse.data.result && nativeResponse.data.result.tokenBalances) {
+                for (const tokenData of nativeResponse.data.result.tokenBalances) {
+                    if (tokenData.contractAddress.toLowerCase() === this.WLD_ADDRESS.toLowerCase()) {
+                        wldBalance = ethers.formatUnits(tokenData.tokenBalance || '0', 18);
+                    } else if (tokenData.tokenBalance && tokenData.tokenBalance !== '0x0') {
+                        // Get token metadata
+                        try {
+                            const metadataResponse = await axios.post(baseURL, {
+                                jsonrpc: '2.0',
+                                id: 3,
+                                method: 'alchemy_getTokenMetadata',
+                                params: [tokenData.contractAddress]
+                            });
+                            
+                            const metadata = metadataResponse.data.result;
+                            if (metadata) {
+                                const balance = ethers.formatUnits(tokenData.tokenBalance, metadata.decimals || 18);
+                                if (parseFloat(balance) > 0) {
+                                    tokens.push({
+                                        symbol: metadata.symbol || 'Unknown',
+                                        balance: parseFloat(balance).toFixed(4),
+                                        address: tokenData.contractAddress
+                                    });
+                                }
+                            }
+                        } catch (metaError) {
+                            // Skip tokens we can't get metadata for
+                        }
+                    }
+                }
+            }
+            
+            return {
+                success: true,
+                ethBalance: parseFloat(ethBalance).toFixed(8),
+                wldBalance: parseFloat(wldBalance).toFixed(4),
+                tokens: tokens
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getDirectPortfolioBalances(walletAddress) {
+        try {
+            // Get ETH balance
+            const ethBalanceWei = await this.provider.getBalance(walletAddress);
+            const ethBalance = ethers.formatEther(ethBalanceWei);
+            
+            // Get WLD balance
+            const wldBalance = await this.getTokenBalanceWithRetry(walletAddress, this.WLD_ADDRESS);
+            
+            return {
+                success: true,
+                ethBalance: parseFloat(ethBalance).toFixed(8),
+                wldBalance: parseFloat(wldBalance).toFixed(4),
+                tokens: []
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
         }
     }
 

@@ -42,7 +42,7 @@ class TradingStrategy extends EventEmitter {
         this.successfulTrades = 0;
         
         // WLD token address
-        this.WLD_ADDRESS = '0x163f8c2467924be0ae7b5347228cabf260318753';
+        this.WLD_ADDRESS = '0x2cfc85d8e48f8eab294be644d9e25c3030863003';
         
         console.log('🎯 Trading Strategy initialized with configuration:', this.strategyConfig);
     }
