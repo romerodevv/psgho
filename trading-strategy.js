@@ -2,9 +2,10 @@ const { ethers } = require('ethers');
 const EventEmitter = require('events');
 
 class TradingStrategy extends EventEmitter {
-    constructor(tradingEngine, config) {
+    constructor(tradingEngine, config, sinclaveEngine = null) {
         super();
         this.tradingEngine = tradingEngine;
+        this.sinclaveEngine = sinclaveEngine; // Enhanced engine for better execution
         this.config = config;
         
         // Strategy configuration with defaults
@@ -45,6 +46,11 @@ class TradingStrategy extends EventEmitter {
         this.WLD_ADDRESS = '0x2cfc85d8e48f8eab294be644d9e25c3030863003';
         
         console.log('🎯 Trading Strategy initialized with configuration:', this.strategyConfig);
+        if (this.sinclaveEngine) {
+            console.log('✅ Sinclave Enhanced Engine available for optimal execution');
+        } else {
+            console.log('⚠️ Using standard trading engine (consider upgrading to Enhanced)');
+        }
     }
 
     // Start the strategy system
@@ -96,7 +102,7 @@ class TradingStrategy extends EventEmitter {
         console.log('✅ Trading Strategy System stopped');
     }
 
-    // Execute a buy trade and open a position
+    // Execute a buy trade and open a position (ENHANCED WITH SINCLAVE ENGINE)
     async executeBuyTrade(wallet, tokenAddress, amountWLD, currentPrice = null) {
         try {
             console.log(`🔄 Executing BUY trade: ${amountWLD} WLD -> ${tokenAddress}`);
@@ -110,34 +116,59 @@ class TradingStrategy extends EventEmitter {
                 throw new Error(`Position size (${amountWLD}) exceeds maximum (${this.strategyConfig.maxPositionSize})`);
             }
             
-            // Get current price quote if not provided
-            if (!currentPrice) {
-                const priceData = await this.tradingEngine.getTokenPrice(tokenAddress);
-                currentPrice = priceData.price;
+            // Use Sinclave Enhanced Engine if available for better execution
+            let result;
+            if (this.sinclaveEngine) {
+                console.log('🚀 Using Sinclave Enhanced Engine for optimal execution...');
+                
+                // Execute with enhanced engine (handles slippage and liquidity checks internally)
+                result = await this.sinclaveEngine.executeOptimizedSwap(
+                    wallet,
+                    this.WLD_ADDRESS,
+                    tokenAddress,
+                    amountWLD,
+                    this.strategyConfig.maxSlippage
+                );
+                
+                if (!result.success) {
+                    throw new Error(`Enhanced trade execution failed: ${result.error}`);
+                }
+                
+                console.log(`✅ Enhanced trade completed in ${result.executionTime}ms`);
+                
+            } else {
+                // Fallback to standard engine with price checks
+                console.log('⚠️ Using standard trading engine (liquidity may be limited)');
+                
+                // Get current price quote if not provided
+                if (!currentPrice) {
+                    const priceData = await this.tradingEngine.getTokenPrice(tokenAddress);
+                    currentPrice = priceData.price;
+                }
+                
+                // Check slippage before executing
+                const quote = await this.getSwapQuote(this.WLD_ADDRESS, tokenAddress, amountWLD);
+                const slippage = this.calculateSlippage(quote.expectedPrice, currentPrice);
+                
+                if (Math.abs(slippage) > this.strategyConfig.maxSlippage) {
+                    throw new Error(`Slippage too high: ${slippage.toFixed(2)}% (max: ${this.strategyConfig.maxSlippage}%)`);
+                }
+                
+                // Execute the trade with standard engine
+                result = await this.tradingEngine.executeSwap(
+                    wallet,
+                    this.WLD_ADDRESS,
+                    tokenAddress,
+                    amountWLD,
+                    this.strategyConfig.maxSlippage
+                );
+                
+                if (!result.success) {
+                    throw new Error(`Trade execution failed: ${result.error}`);
+                }
             }
             
-            // Check slippage before executing
-            const quote = await this.getSwapQuote(this.WLD_ADDRESS, tokenAddress, amountWLD);
-            const slippage = this.calculateSlippage(quote.expectedPrice, currentPrice);
-            
-            if (Math.abs(slippage) > this.strategyConfig.maxSlippage) {
-                throw new Error(`Slippage too high: ${slippage.toFixed(2)}% (max: ${this.strategyConfig.maxSlippage}%)`);
-            }
-            
-            // Execute the trade
-            const result = await this.tradingEngine.executeSwap(
-                wallet,
-                this.WLD_ADDRESS,
-                tokenAddress,
-                amountWLD,
-                this.strategyConfig.maxSlippage
-            );
-            
-            if (!result.success) {
-                throw new Error(`Trade execution failed: ${result.error}`);
-            }
-            
-            // Create position record
+            // Create position record (works with both engines)
             const position = {
                 id: `pos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 tokenAddress: tokenAddress,
@@ -145,11 +176,12 @@ class TradingStrategy extends EventEmitter {
                 status: 'open',
                 
                 // Entry data
-                entryPrice: currentPrice, // WLD per token
+                entryPrice: currentPrice || (result.tokensReceived && result.tokensSpent ? 
+                    parseFloat(result.tokensSpent) / parseFloat(result.tokensReceived) : 0),
                 entryAmountWLD: parseFloat(amountWLD),
-                entryAmountToken: parseFloat(result.amountOut),
+                entryAmountToken: parseFloat(result.amountOut || result.tokensReceived || 0),
                 entryTimestamp: Date.now(),
-                entryTxHash: result.txHash,
+                entryTxHash: result.txHash || result.transactionHash,
                 
                 // Current data (updated by monitoring)
                 currentPrice: currentPrice,
@@ -198,7 +230,7 @@ class TradingStrategy extends EventEmitter {
         }
     }
 
-    // Execute a sell trade and close a position
+    // Execute a sell trade and close a position (ENHANCED WITH SINCLAVE ENGINE)
     async executeSellTrade(tokenAddress, reason = 'manual') {
         try {
             const position = this.positions.get(tokenAddress);
@@ -208,21 +240,48 @@ class TradingStrategy extends EventEmitter {
             
             console.log(`🔄 Executing SELL trade: ${position.entryAmountToken} tokens -> WLD (${reason})`);
             
-            // Get current price
-            const currentPrice = await this.getCurrentTokenPrice(tokenAddress);
+            // We need the full wallet object - this would need to be passed in or retrieved
+            const wallet = { address: position.walletAddress }; // This is a limitation - we need the private key
             
-            // Execute the sell trade
-            const wallet = { address: position.walletAddress }; // We'd need to get the full wallet object
-            const result = await this.tradingEngine.executeSwap(
-                wallet,
-                tokenAddress,
-                this.WLD_ADDRESS,
-                position.entryAmountToken,
-                this.strategyConfig.maxSlippage
-            );
-            
-            if (!result.success) {
-                throw new Error(`Sell execution failed: ${result.error}`);
+            // Use Sinclave Enhanced Engine if available for better execution
+            let result;
+            if (this.sinclaveEngine) {
+                console.log('🚀 Using Sinclave Enhanced Engine for optimal sell execution...');
+                
+                // Execute with enhanced engine
+                result = await this.sinclaveEngine.executeOptimizedSwap(
+                    wallet,
+                    tokenAddress,
+                    this.WLD_ADDRESS,
+                    position.entryAmountToken,
+                    this.strategyConfig.maxSlippage
+                );
+                
+                if (!result.success) {
+                    throw new Error(`Enhanced sell execution failed: ${result.error}`);
+                }
+                
+                console.log(`✅ Enhanced sell completed in ${result.executionTime}ms`);
+                
+            } else {
+                // Fallback to standard engine
+                console.log('⚠️ Using standard trading engine for sell (liquidity may be limited)');
+                
+                // Get current price
+                const currentPrice = await this.getCurrentTokenPrice(tokenAddress);
+                
+                // Execute the sell trade
+                result = await this.tradingEngine.executeSwap(
+                    wallet,
+                    tokenAddress,
+                    this.WLD_ADDRESS,
+                    position.entryAmountToken,
+                    this.strategyConfig.maxSlippage
+                );
+                
+                if (!result.success) {
+                    throw new Error(`Sell execution failed: ${result.error}`);
+                }
             }
             
             // Calculate final P&L
@@ -442,21 +501,72 @@ class TradingStrategy extends EventEmitter {
         }
     }
 
-    // Get current token price by simulating a sell quote
+    // Get current token price by simulating a sell quote (ENHANCED)
     async getCurrentTokenPrice(tokenAddress) {
         try {
-            // Simulate selling 1 token to get current price
+            // Use Sinclave Enhanced Engine for better price discovery if available
+            if (this.sinclaveEngine) {
+                try {
+                    // Use HoldStation SDK for accurate price discovery
+                    const quote = await this.sinclaveEngine.getHoldStationQuote(
+                        tokenAddress, 
+                        this.WLD_ADDRESS, 
+                        1, // 1 token
+                        '0x0000000000000000000000000000000000000001' // dummy receiver
+                    );
+                    
+                    if (quote && quote.expectedOutput) {
+                        const price = parseFloat(quote.expectedOutput);
+                        return price > 0 ? price : 0;
+                    }
+                } catch (enhancedError) {
+                    console.log(`⚠️ Enhanced price discovery failed: ${enhancedError.message}`);
+                    // Fall back to standard method
+                }
+            }
+            
+            // Fallback to standard quote method
             const quote = await this.getSwapQuote(tokenAddress, this.WLD_ADDRESS, 1);
             return quote.pricePerToken;
         } catch (error) {
             console.error(`❌ Error getting current price for ${tokenAddress}:`, error.message);
-            return 0;
+            throw new Error(`No liquidity found for this pair`);
         }
     }
 
-    // Get swap quote
+    // Get swap quote (ENHANCED WITH FALLBACK)
     async getSwapQuote(tokenIn, tokenOut, amountIn) {
         try {
+            // Try enhanced engine first if available
+            if (this.sinclaveEngine) {
+                try {
+                    const quote = await this.sinclaveEngine.getHoldStationQuote(
+                        tokenIn, 
+                        tokenOut, 
+                        amountIn, 
+                        '0x0000000000000000000000000000000000000001' // dummy receiver
+                    );
+                    
+                    if (quote && quote.expectedOutput) {
+                        const expectedOutput = parseFloat(quote.expectedOutput);
+                        const pricePerToken = tokenOut === this.WLD_ADDRESS ? expectedOutput / amountIn : amountIn / expectedOutput;
+                        
+                        return {
+                            amountIn,
+                            expectedOutput,
+                            pricePerToken,
+                            expectedPrice: pricePerToken,
+                            fee: 0.2, // HoldStation fee
+                            slippage: 0.5, // Default slippage
+                            provider: 'HoldStation'
+                        };
+                    }
+                } catch (enhancedError) {
+                    console.log(`⚠️ Enhanced quote failed: ${enhancedError.message}, using fallback`);
+                }
+            }
+            
+            // Fallback to standard engine
             const priceData = await this.tradingEngine.getTokenPrice(tokenOut);
             
             // Calculate expected output
@@ -469,7 +579,8 @@ class TradingStrategy extends EventEmitter {
                 pricePerToken,
                 expectedPrice: priceData.price,
                 fee: priceData.fee,
-                slippage: 0 // Would be calculated based on liquidity
+                slippage: 0, // Would be calculated based on liquidity
+                provider: 'Uniswap'
             };
         } catch (error) {
             throw new Error(`Quote failed: ${error.message}`);

@@ -44,9 +44,9 @@ class WorldchainTradingBot {
         this.tradingEngine = new AdvancedTradingEngine(this.provider, this.config);
         this.sinclaveEngine = new SinclaveEnhancedTradingEngine(this.provider, this.config);
         this.tokenDiscovery = new TokenDiscoveryService(this.provider, this.config);
-        this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config);
         
-        // Setup strategy event listeners
+        // Initialize trading strategy with both engines
+        this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config, this.sinclaveEngine);
         this.setupStrategyEventListeners();
         
         // WLD token address on Worldchain (correct address)
