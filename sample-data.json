@@ -1,0 +1,66 @@
+{
+  "wallets": [
+    {
+      "address": "0x1234567890123456789012345678901234567890",
+      "name": "Wallet 1",
+      "addedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "address": "0x0987654321098765432109876543210987654321",
+      "name": "Wallet 2",
+      "addedAt": "2025-01-01T01:00:00.000Z"
+    }
+  ],
+  "tradingPairs": [
+    {
+      "base": "WLD",
+      "quote": "ORO",
+      "baseAddress": "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+      "quoteAddress": "0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63",
+      "active": true,
+      "tokenName": "ORO Token",
+      "decimals": 18
+    },
+    {
+      "base": "WLD",
+      "quote": "YIELD",
+      "baseAddress": "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+      "quoteAddress": "0x1234567890123456789012345678901234567890",
+      "active": true,
+      "tokenName": "YIELD Token",
+      "decimals": 18
+    }
+  ],
+  "portfolio": {
+    "0x1234567890123456789012345678901234567890": {
+      "eth": "0.5",
+      "tokens": {
+        "WLD": {
+          "address": "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+          "name": "Worldcoin",
+          "balance": "100.0",
+          "decimals": 18
+        },
+        "ORO": {
+          "address": "0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63",
+          "name": "ORO Token",
+          "balance": "500.0",
+          "decimals": 18
+        }
+      },
+      "lastUpdated": "2025-01-01T00:00:00.000Z"
+    },
+    "0x0987654321098765432109876543210987654321": {
+      "eth": "1.2",
+      "tokens": {
+        "WLD": {
+          "address": "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+          "name": "Worldcoin",
+          "balance": "250.0",
+          "decimals": 18
+        }
+      },
+      "lastUpdated": "2025-01-01T01:00:00.000Z"
+    }
+  }
+}

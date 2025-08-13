@@ -1,0 +1,33 @@
+{
+  "name": "worldchain-interactive-trading-bot",
+  "version": "1.0.0",
+  "description": "Interactive Worldcoin Trading Bot with Wallet Management and Token Discovery",
+  "main": "trading-bot.js",
+  "scripts": {
+    "start": "node trading-bot.js",
+    "dev": "nodemon trading-bot.js"
+  },
+  "dependencies": {
+    "ethers": "^5.7.2",
+    "@holdstation/worldchain-ethers-v5": "^1.0.0",
+    "@holdstation/worldchain-sdk": "^1.0.0",
+    "inquirer": "^8.2.6",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "cli-table3": "^0.6.3",
+    "fs-extra": "^11.1.1",
+    "node-cron": "^3.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "worldcoin",
+    "trading",
+    "bot",
+    "defi",
+    "ethereum"
+  ],
+  "author": "Trading Bot Developer",
+  "license": "MIT"
+}
