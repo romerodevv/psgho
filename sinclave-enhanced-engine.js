@@ -146,14 +146,25 @@ class SinclaveEnhancedTradingEngine {
         return quote;
     }
     
-    // Calculate optimized gas settings (from sinclave.js)
-    calculateOptimizedGasSettings(networkGasPrice) {
+    // Calculate optimized gas settings (from sinclave.js) - ENHANCED FOR REPLACEMENT TXS
+    calculateOptimizedGasSettings(networkGasPrice, isReplacementTx = false) {
         const baseGasPrice = this.OPTIMAL_GAS_SETTINGS.baseGasPrice;
-        const priorityFee = this.OPTIMAL_GAS_SETTINGS.priorityFee;
+        let priorityFee = this.OPTIMAL_GAS_SETTINGS.priorityFee;
+        
+        // For replacement transactions, increase gas price by 10% minimum
+        if (isReplacementTx) {
+            priorityFee = priorityFee * BigInt(110) / BigInt(100); // 10% increase
+            console.log('⚡ Replacement transaction detected, increasing gas price by 10%');
+        }
         
         // Only increase if network demands it
         const networkGas = networkGasPrice || baseGasPrice;
-        const finalGasPrice = networkGas > baseGasPrice ? networkGas : baseGasPrice;
+        let finalGasPrice = networkGas > baseGasPrice ? networkGas : baseGasPrice;
+        
+        // For replacement transactions, ensure minimum 10% increase
+        if (isReplacementTx) {
+            finalGasPrice = finalGasPrice * BigInt(110) / BigInt(100);
+        }
         
         return {
             maxFeePerGas: finalGasPrice + priorityFee,
@@ -260,17 +271,45 @@ class SinclaveEnhancedTradingEngine {
                 console.log('✅ Already approved - proceeding to swap');
             }
             
-            // Step 8: Execute optimized swap (FAST EXECUTION)
+            // Step 8: Execute optimized swap (FAST EXECUTION WITH REPLACEMENT TX HANDLING)
             console.log('🔄 Executing optimized swap with proven patterns...');
             
-            const swapTx = await signer.sendTransaction({
-                to: fixedQuote.to,
-                data: fixedQuote.data,
-                value: fixedQuote.value || '0',
-                gasLimit: gasSettings.gasLimit,
-                maxFeePerGas: gasSettings.maxFeePerGas,
-                maxPriorityFeePerGas: gasSettings.maxPriorityFeePerGas
-            });
+            let swapTx;
+            let retryCount = 0;
+            const maxRetries = 2;
+            
+            while (retryCount <= maxRetries) {
+                try {
+                    // Use replacement transaction gas settings if this is a retry
+                    const finalGasSettings = retryCount > 0 ? 
+                        this.calculateOptimizedGasSettings(feeData.gasPrice, true) : gasSettings;
+                    
+                    if (retryCount > 0) {
+                        console.log(`🔄 Retry attempt ${retryCount} with higher gas prices...`);
+                    }
+                    
+                    swapTx = await signer.sendTransaction({
+                        to: fixedQuote.to,
+                        data: fixedQuote.data,
+                        value: fixedQuote.value || '0',
+                        gasLimit: finalGasSettings.gasLimit,
+                        maxFeePerGas: finalGasSettings.maxFeePerGas,
+                        maxPriorityFeePerGas: finalGasSettings.maxPriorityFeePerGas
+                    });
+                    
+                    break; // Success, exit retry loop
+                    
+                } catch (txError) {
+                    if (txError.code === 'REPLACEMENT_UNDERPRICED' && retryCount < maxRetries) {
+                        console.log(`⚠️ Replacement fee too low, retrying with higher gas (attempt ${retryCount + 1}/${maxRetries + 1})`);
+                        retryCount++;
+                        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                        continue;
+                    } else {
+                        throw txError; // Re-throw if not a replacement error or max retries reached
+                    }
+                }
+            }
             
             console.log(`🚀 Swap TX sent: ${swapTx.hash}`);
             console.log(`🔗 WorldScan: https://worldscan.org/tx/${swapTx.hash}`);

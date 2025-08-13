@@ -36,6 +36,7 @@ class TradingStrategy extends EventEmitter {
         this.priceHistory = new Map(); // tokenAddress -> price history array
         this.monitoringIntervals = new Map(); // tokenAddress -> interval ID
         this.walletObjects = new Map(); // walletAddress -> full wallet object (for sell trades)
+        this.positionLocks = new Map(); // tokenAddress -> boolean (prevent concurrent sells)
         
         // Strategy state
         this.isRunning = false;
@@ -495,8 +496,24 @@ class TradingStrategy extends EventEmitter {
                 console.log(`💰 Expected return: ${currentWLDValue.toFixed(6)} WLD (profit: ${unrealizedPnL.toFixed(6)} WLD)`);
                 
                 if (canExecuteReverseSwap) {
-                    console.log(`🚀 Executing profitable reverse swap...`);
-                    await this.executeSellTrade(tokenAddress, 'profit_target');
+                    // Check if position is already being sold
+                    if (this.positionLocks.get(tokenAddress)) {
+                        console.log(`⏳ Position ${position.id} is already being processed, skipping...`);
+                        return;
+                    }
+                    
+                    // Lock the position to prevent concurrent sells
+                    this.positionLocks.set(tokenAddress, true);
+                    console.log(`🔒 Locking position ${position.id} for sell execution`);
+                    
+                    try {
+                        console.log(`🚀 Executing profitable reverse swap...`);
+                        await this.executeSellTrade(tokenAddress, 'profit_target');
+                    } finally {
+                        // Always unlock the position, even if sell fails
+                        this.positionLocks.delete(tokenAddress);
+                        console.log(`🔓 Unlocked position ${position.id}`);
+                    }
                 } else {
                     console.log(`⚠️ Cannot execute reverse swap, monitoring continues...`);
                 }
@@ -509,8 +526,24 @@ class TradingStrategy extends EventEmitter {
                 console.log(`💸 Expected return: ${currentWLDValue.toFixed(6)} WLD (loss: ${Math.abs(unrealizedPnL).toFixed(6)} WLD)`);
                 
                 if (canExecuteReverseSwap) {
-                    console.log(`🚨 Executing stop loss reverse swap...`);
-                    await this.executeSellTrade(tokenAddress, 'stop_loss');
+                    // Check if position is already being sold
+                    if (this.positionLocks.get(tokenAddress)) {
+                        console.log(`⏳ Position ${position.id} is already being processed, skipping...`);
+                        return;
+                    }
+                    
+                    // Lock the position to prevent concurrent sells
+                    this.positionLocks.set(tokenAddress, true);
+                    console.log(`🔒 Locking position ${position.id} for stop loss execution`);
+                    
+                    try {
+                        console.log(`🚨 Executing stop loss reverse swap...`);
+                        await this.executeSellTrade(tokenAddress, 'stop_loss');
+                    } finally {
+                        // Always unlock the position, even if sell fails
+                        this.positionLocks.delete(tokenAddress);
+                        console.log(`🔓 Unlocked position ${position.id}`);
+                    }
                 } else {
                     console.log(`⚠️ Cannot execute reverse swap, monitoring continues...`);
                 }
