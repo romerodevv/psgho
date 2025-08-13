@@ -13,6 +13,7 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
+GRAY='\033[0;37m'
 NC='\033[0m' # No Color
 
 # Fancy printing functions
@@ -106,14 +107,41 @@ install_dependencies() {
     print_step "2" "Installing Cocoliso Premium Components"
     
     print_info "Installing premium trading dependencies..."
+    echo -e "${YELLOW}⏱️  This step typically takes 3-5 minutes depending on your internet connection${NC}"
+    echo -e "${CYAN}📊 Progress will be shown below...${NC}"
+    echo ""
+    
     if [ -f "package.json" ]; then
-        # Use premium npm settings
-        npm install --silent --no-fund --no-audit &>/dev/null
-        print_info "Installing HoldStation SDK for premium Worldchain trading..."
-        npm install @holdstation/worldchain-sdk@latest --silent --no-fund --no-audit &>/dev/null
-        npm install @holdstation/worldchain-ethers-v6@latest --silent --no-fund --no-audit &>/dev/null
-        npm install @worldcoin/minikit-js@latest --silent --no-fund --no-audit &>/dev/null
-        print_success "All premium trading components and HoldStation SDK installed!"
+        # Use verbose npm settings for better user feedback
+        print_info "📦 [1/4] Installing Node.js dependencies (2-3 minutes)..."
+        echo -e "${GRAY}Running: npm install --verbose --progress=true${NC}"
+        echo ""
+        npm install --verbose --progress=true
+        echo ""
+        print_success "✅ [1/4] Core dependencies installed successfully!"
+        
+        print_info "🚀 [2/4] Installing HoldStation SDK for premium Worldchain trading..."
+        echo -e "${GRAY}Running: npm install @holdstation/worldchain-sdk@latest${NC}"
+        echo ""
+        npm install @holdstation/worldchain-sdk@latest --verbose --progress=true
+        echo ""
+        print_success "✅ [2/4] HoldStation SDK installed successfully!"
+        
+        print_info "⚡ [3/4] Installing HoldStation Ethers v6 adapter..."
+        echo -e "${GRAY}Running: npm install @holdstation/worldchain-ethers-v6@latest${NC}"
+        echo ""
+        npm install @holdstation/worldchain-ethers-v6@latest --verbose --progress=true
+        echo ""
+        print_success "✅ [3/4] HoldStation Ethers adapter installed successfully!"
+        
+        print_info "🌍 [4/4] Installing WorldCoin MiniKit dependency..."
+        echo -e "${GRAY}Running: npm install @worldcoin/minikit-js@latest${NC}"
+        echo ""
+        npm install @worldcoin/minikit-js@latest --verbose --progress=true
+        echo ""
+        print_success "✅ [4/4] WorldCoin MiniKit installed successfully!"
+        
+        print_success "🎉 All premium trading components and HoldStation SDK installed!"
     else
         print_warning "package.json not found, creating premium setup..."
         # Create premium package.json
@@ -148,10 +176,18 @@ install_dependencies() {
   }
 }
 EOF
-        npm install --silent --no-fund --no-audit &>/dev/null
-        print_success "Premium setup created with advanced dependencies!"
+        print_info "📦 Installing all dependencies with verbose output (3-5 minutes)..."
+        echo -e "${YELLOW}⏱️  Please be patient - this includes HoldStation SDK and all premium components${NC}"
+        echo -e "${GRAY}Running: npm install --verbose --progress=true${NC}"
+        echo ""
+        npm install --verbose --progress=true
+        echo ""
+        print_success "🎉 Premium setup created with advanced dependencies!"
     fi
     
+    echo ""
+    print_premium "🚀 Dependency installation completed successfully!"
+    print_info "Next: Creating premium helper scripts..."
     echo ""
 }
 
