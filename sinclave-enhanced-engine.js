@@ -208,23 +208,24 @@ class SinclaveEnhancedTradingEngine {
                 throw new Error(`Insufficient balance. Have: ${ethers.formatUnits(tokenInBalance, tokenInDecimals)}, Need: ${amountIn}`);
             }
             
-            // Step 4: Get optimized quote using multiple sources
-            console.log('📈 Getting optimized swap quote...');
-            
-            // Try HoldStation SDK first (if available), then fallback to Uniswap
-            let quote;
-            let useHoldStationSDK = false;
-            
-            try {
-                // Attempt to use HoldStation SDK (like sinclave.js)
-                quote = await this.getHoldStationQuote(tokenIn, tokenOut, amountIn, signer.address);
-                useHoldStationSDK = true;
-                console.log('✅ Using HoldStation SDK for optimal routing');
-            } catch (error) {
-                console.log('⚠️ HoldStation SDK unavailable, using Uniswap V3');
-                quote = await this.getUniswapQuote(tokenIn, tokenOut, amountInWei);
-                useHoldStationSDK = false;
-            }
+                         // Step 4: Get optimized quote using multiple sources
+             console.log('📈 Getting optimized swap quote...');
+             
+             // Try HoldStation SDK first (if available), then fallback to Uniswap
+             let quote;
+             let useHoldStationSDK = false;
+             
+             try {
+                 // Attempt to use HoldStation SDK (like sinclave.js)
+                 quote = await this.getHoldStationQuote(tokenIn, tokenOut, amountIn, signer.address);
+                 useHoldStationSDK = true;
+                 console.log('✅ Using HoldStation SDK for optimal routing');
+             } catch (error) {
+                 console.log(`⚠️ HoldStation SDK failed: ${error.message}`);
+                 console.log('🔄 Fallback: Using Uniswap V3');
+                 quote = await this.getUniswapQuote(tokenIn, tokenOut, amountInWei);
+                 useHoldStationSDK = false;
+             }
             
             if (!quote || !quote.to) {
                 throw new Error('No swap quote available for this trading pair');
@@ -344,9 +345,82 @@ class SinclaveEnhancedTradingEngine {
     
     // Get HoldStation SDK quote (like sinclave.js)
     async getHoldStationQuote(tokenIn, tokenOut, amountIn, receiver) {
-        // This would require the HoldStation SDK to be installed
-        // For now, we'll simulate the structure
-        throw new Error('HoldStation SDK not available - install @holdstation/worldchain-sdk');
+        try {
+            console.log('🚀 Initializing HoldStation SDK...');
+            
+            // Dynamic import for HoldStation SDK
+            const { Client, Multicall3 } = await import("@holdstation/worldchain-ethers-v6");
+            const { 
+                config, 
+                HoldSo, 
+                inmemoryTokenStorage, 
+                SwapHelper, 
+                TokenProvider, 
+                ZeroX,
+                setPartnerCode 
+            } = await import("@holdstation/worldchain-sdk");
+
+            // Set partner code (like sinclave.js)
+            try {
+                setPartnerCode("WORLDCHAIN_TRADING_BOT_2025");
+                console.log('✅ Partner code set for HoldStation SDK');
+            } catch (error) {
+                console.log('⚠️ Partner code already set');
+            }
+
+            // Initialize client and components
+            const provider = await this.initializeOptimizedProvider();
+            const client = new Client(provider);
+            config.client = client;
+            config.multicall3 = new Multicall3(provider);
+
+            // Initialize swap helper with providers
+            const swapHelper = new SwapHelper(client, {
+                tokenStorage: inmemoryTokenStorage,
+            });
+
+            const tokenProvider = new TokenProvider({ client, multicall3: config.multicall3 });
+            const zeroX = new ZeroX(tokenProvider, inmemoryTokenStorage);
+            const worldswap = new HoldSo(tokenProvider, inmemoryTokenStorage);
+            
+            // Load swap providers
+            swapHelper.load(zeroX);
+            swapHelper.load(worldswap);
+
+            console.log('✅ HoldStation SDK initialized successfully');
+
+            // Get swap quote using HoldStation
+            const params = {
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                amountIn: amountIn.toString(),
+                slippage: "0.5",
+                fee: "0.2",
+                receiver: receiver
+            };
+            
+            console.log(`📊 Getting HoldStation quote for ${params.amountIn} tokens...`);
+            const quote = await swapHelper.estimate.quote(params);
+
+            if (!quote || !quote.to) {
+                throw new Error('HoldStation SDK returned no quote for this pair');
+            }
+
+            console.log('✅ HoldStation quote received successfully');
+            
+            return {
+                to: quote.to,
+                data: quote.data,
+                value: quote.value || '0',
+                expectedOutput: quote.addons?.outAmount || 'Unknown',
+                gasEstimate: quote.gasEstimate,
+                provider: 'HoldStation'
+            };
+
+        } catch (error) {
+            console.log(`❌ HoldStation SDK error: ${error.message}`);
+            throw new Error(`HoldStation SDK unavailable or failed: ${error.message}`);
+        }
     }
     
     // Fallback to Uniswap V3 quote

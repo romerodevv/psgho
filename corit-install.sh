@@ -175,7 +175,10 @@ install_dependencies() {
     if [ -f "package.json" ]; then
         # Use professional npm settings
         npm install --silent --no-fund --no-audit &>/dev/null
-        print_success "All professional trading components installed!"
+        print_info "Installing HoldStation SDK for professional Worldchain trading..."
+        npm install @holdstation/worldchain-sdk@latest --silent --no-fund --no-audit &>/dev/null
+        npm install @holdstation/worldchain-ethers-v6@latest --silent --no-fund --no-audit &>/dev/null
+        print_success "All professional trading components and HoldStation SDK installed!"
     else
         print_warning "package.json not found, creating professional setup..."
         # Create professional package.json
