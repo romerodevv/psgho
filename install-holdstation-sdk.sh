@@ -20,6 +20,7 @@ echo "📦 Installing HoldStation SDK dependencies..."
 # Install HoldStation SDK packages
 npm install @holdstation/worldchain-sdk@latest
 npm install @holdstation/worldchain-ethers-v6@latest
+npm install @worldcoin/minikit-js@latest
 
 # Verify installation
 echo ""
