@@ -1761,6 +1761,9 @@ class WorldchainTradingBot {
         }
         
         try {
+            // Ensure trading strategy has access to wallet objects for sell trades
+            this.tradingStrategy.setWalletObjects(this.wallets);
+            
             // Select wallet
             console.log(chalk.white('\n💼 SELECT WALLET:'));
             this.wallets.forEach((wallet, index) => {

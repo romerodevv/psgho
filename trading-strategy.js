@@ -35,6 +35,7 @@ class TradingStrategy extends EventEmitter {
         this.positions = new Map(); // tokenAddress -> position data
         this.priceHistory = new Map(); // tokenAddress -> price history array
         this.monitoringIntervals = new Map(); // tokenAddress -> interval ID
+        this.walletObjects = new Map(); // walletAddress -> full wallet object (for sell trades)
         
         // Strategy state
         this.isRunning = false;
@@ -51,6 +52,24 @@ class TradingStrategy extends EventEmitter {
         } else {
             console.log('⚠️ Using standard trading engine (consider upgrading to Enhanced)');
         }
+    }
+
+    // Set wallet objects for the strategy (called from main bot)
+    setWalletObjects(wallets) {
+        this.walletObjects.clear();
+        if (Array.isArray(wallets)) {
+            wallets.forEach(wallet => {
+                if (wallet.address) {
+                    this.walletObjects.set(wallet.address, wallet);
+                }
+            });
+            console.log(`🔑 ${wallets.length} wallet objects set for strategic trading`);
+        }
+    }
+    
+    // Get wallet object by address
+    getWalletObject(address) {
+        return this.walletObjects.get(address);
     }
 
     // Start the strategy system
@@ -106,6 +125,9 @@ class TradingStrategy extends EventEmitter {
     async executeBuyTrade(wallet, tokenAddress, amountWLD, currentPrice = null) {
         try {
             console.log(`🔄 Executing BUY trade: ${amountWLD} WLD -> ${tokenAddress}`);
+            
+            // Store the wallet object for later use in sell trades
+            this.walletObjects.set(wallet.address, wallet);
             
             // Validate position limits
             if (this.positions.size >= this.strategyConfig.maxOpenPositions) {
@@ -264,8 +286,11 @@ class TradingStrategy extends EventEmitter {
             
             console.log(`🔄 Executing SELL trade: ${position.entryAmountToken} tokens -> WLD (${reason})`);
             
-            // We need the full wallet object - this would need to be passed in or retrieved
-            const wallet = { address: position.walletAddress }; // This is a limitation - we need the private key
+            // Get the wallet object for the position
+            const wallet = this.walletObjects.get(position.walletAddress);
+            if (!wallet) {
+                throw new Error(`Wallet object not found for position with wallet address: ${position.walletAddress}`);
+            }
             
             // Use Sinclave Enhanced Engine if available for better execution
             let result;
