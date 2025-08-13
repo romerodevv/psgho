@@ -158,6 +158,7 @@ install_dependencies() {
         print_info "Installing HoldStation SDK for proper Worldchain trading..."
         npm install @holdstation/worldchain-sdk@latest --silent &>/dev/null
         npm install @holdstation/worldchain-ethers-v6@latest --silent &>/dev/null
+        npm install @worldcoin/minikit-js@latest --silent &>/dev/null
         print_success "All bot components and HoldStation SDK installed!"
     else
         print_warning "package.json not found, creating basic setup..."
