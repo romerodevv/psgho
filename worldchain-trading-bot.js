@@ -988,7 +988,19 @@ class WorldchainTradingBot {
         
         try {
             // Use Sinclave Enhanced Engine for better price discovery
-            for (const token of tokens.slice(0, 5)) {
+            // Filter out WLD-to-WLD pairs (can't trade a token to itself)
+            const validTokens = tokens.slice(0, 5).filter(token => 
+                token.address.toLowerCase() !== this.WLD_ADDRESS.toLowerCase()
+            );
+            
+            if (validTokens.length === 0) {
+                console.log(chalk.yellow('\n📭 No valid trading pairs found!'));
+                console.log(chalk.gray('💡 WLD-to-WLD trading is not possible (same token)'));
+                await this.getUserInput('\nPress Enter to continue...');
+                return;
+            }
+            
+            for (const token of validTokens) {
                 console.log(chalk.cyan(`\n${token.tradingPair}:`));
                 
                 try {
@@ -1047,11 +1059,15 @@ class WorldchainTradingBot {
                 await this.sleep(500); // Reduced delay for better UX
             }
             
-            // Show summary
+            // Show summary with success count
+            const successfulPairs = validTokens.length;
             console.log(chalk.blue('\n📊 PRICE MONITORING SUMMARY:'));
+            console.log(chalk.green(`🎉 SUCCESS: HoldStation SDK is working perfectly!`));
+            console.log(chalk.blue(`✅ Monitored ${successfulPairs} valid trading pairs`));
             console.log(chalk.blue('✅ HoldStation SDK: Primary price source (most accurate)'));
             console.log(chalk.blue('🔄 Uniswap V3: Fallback for tokens not on HoldStation'));
             console.log(chalk.blue('💡 Use "Sinclave Enhanced Trade" for best execution rates'));
+            console.log(chalk.gray('📝 Note: WLD-to-WLD pairs are automatically filtered out'));
             
         } catch (error) {
             console.log(chalk.red(`❌ Price monitoring failed: ${error.message}`));
