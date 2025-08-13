@@ -1,0 +1,98 @@
+🌍 WorldChain Trading Bot - Novice Installation Package
+================================================================
+
+📦 What's in this package?
+- Complete trading bot with strategy system
+- Auto-installer that does everything for you
+- Beginner-friendly helper scripts
+- Step-by-step tutorials
+- Safe default settings for new traders
+
+🚀 SUPER EASY INSTALLATION (3 commands!)
+========================================
+
+1. Extract the package:
+   tar -xzf worldchain-bot-novice.tar.gz
+   cd worldchain-bot-novice
+
+2. Run the auto-installer:
+   ./auto-install.sh
+
+3. Start trading:
+   ./start-bot.sh
+
+That's it! The installer does everything automatically! 🎉
+
+📖 What the auto-installer does:
+- ✅ Detects your Linux system
+- ✅ Installs Node.js automatically
+- ✅ Sets up all dependencies
+- ✅ Creates safe beginner settings
+- ✅ Makes helpful scripts for you
+- ✅ Sets up security features
+
+🎯 After installation, you get these easy commands:
+==================================================
+./start-bot.sh       - Start the trading bot (main command)
+./check-status.sh     - See if bot is running
+./view-profits.sh     - Check your profits
+./backup.sh          - Save your data safely
+./restart-bot.sh     - Fix most problems
+./view-logs.sh       - See what bot is doing
+./fix-permissions.sh - Fix file permission errors
+
+📚 Documentation included:
+=========================
+• NOVICE_INSTALL.md - Complete beginner guide
+• BEGINNER_TUTORIAL.txt - Quick start tutorial
+• README.md - Full feature documentation
+• DEPLOYMENT.md - Advanced deployment options
+
+🔒 Safety features for beginners:
+=================================
+- Practice mode enabled by default (no real money at risk)
+- Conservative profit targets (1% recommended)
+- Stop-loss protection (-3% default)
+- Small position limits (max 10 WLD per trade)
+- All private keys stored locally and securely
+
+💡 First time setup (5 minutes):
+================================
+1. Run: ./start-bot.sh
+2. Create wallet (Menu 1 → Option 1) 
+3. Add tokens (Menu 2 → Option 2)
+4. Configure strategy (Menu 4 → Option 5)
+5. Start automated trading (Menu 4 → Option 1)
+
+🆘 Need help?
+=============
+- Read NOVICE_INSTALL.md for detailed instructions
+- Read BEGINNER_TUTORIAL.txt for quick tips
+- Run ./fix-permissions.sh if you get permission errors
+- Run ./restart-bot.sh if something stops working
+
+📋 System requirements:
+======================
+- Linux server (Ubuntu, Debian, CentOS, RHEL, etc.)
+- 1GB+ RAM recommended
+- 2GB+ free disk space
+- Internet connection
+- SSH access (for remote servers)
+
+🎉 What your bot will do:
+========================
+✅ Monitor token prices 24/7 (even while you sleep!)
+✅ Automatically sell when you hit profit targets
+✅ Protect you from big losses with stop-losses
+✅ Find good buying opportunities (DIPs)
+✅ Track all your trades and calculate profits
+✅ Work with WLD-based trading pairs (WLD-ORO, WLD-YIELD, etc.)
+
+Remember: Start small, learn as you go, and never risk money you can't afford to lose!
+
+Happy Trading! 🌍💰🎯
+
+================================================================
+WorldChain Trading Bot v1.0.0 - Novice Edition
+Created for crypto trading beginners
+================================================================
