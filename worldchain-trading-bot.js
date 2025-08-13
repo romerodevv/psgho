@@ -721,10 +721,11 @@ class WorldchainTradingBot {
             console.log(chalk.gray('─'.repeat(30)));
             console.log(chalk.cyan('1. 🔄 Execute Trade'));
             console.log(chalk.cyan('2. 📊 View Trading Pairs'));
-            console.log(chalk.cyan('3. ⚡ High-Speed Trading Mode'));
-            console.log(chalk.cyan('4. 📈 Price Monitoring'));
-            console.log(chalk.cyan('5. 📋 Trade History'));
-            console.log(chalk.red('6. ⬅️  Back to Main Menu'));
+            console.log(chalk.cyan('3. 🔍 Check Pair Liquidity'));
+            console.log(chalk.cyan('4. ⚡ High-Speed Trading Mode'));
+            console.log(chalk.cyan('5. 📈 Price Monitoring'));
+            console.log(chalk.cyan('6. 📋 Trade History'));
+            console.log(chalk.red('7. ⬅️  Back to Main Menu'));
             
             const choice = await this.getUserInput('\nSelect option: ');
             
@@ -736,15 +737,18 @@ class WorldchainTradingBot {
                     await this.viewTradingPairs();
                     break;
                 case '3':
-                    await this.highSpeedTradingMode();
+                    await this.checkPairLiquidity();
                     break;
                 case '4':
-                    await this.priceMonitoring();
+                    await this.highSpeedTradingMode();
                     break;
                 case '5':
-                    await this.tradeHistory();
+                    await this.priceMonitoring();
                     break;
                 case '6':
+                    await this.tradeHistory();
+                    break;
+                case '7':
                     return;
                 default:
                     console.log(chalk.red('❌ Invalid option'));
@@ -822,15 +826,29 @@ class WorldchainTradingBot {
         try {
             const result = await this.simulateTrade(selectedWallet, selectedToken, direction === '1', parseFloat(amount));
             
-            console.log(chalk.green('\n✅ Trade executed successfully!'));
-            console.log(chalk.white(`📊 Pair: ${selectedToken.tradingPair}`));
-            console.log(chalk.white(`💰 Amount: ${amount}`));
-            console.log(chalk.white(`📈 Direction: ${direction === '1' ? 'BUY' : 'SELL'}`));
-            console.log(chalk.white(`⛽ Gas Used: ${result.gasUsed}`));
-            console.log(chalk.white(`🧾 Transaction Hash: ${result.txHash}`));
+            if (result && result.success !== false) {
+                console.log(chalk.green('\n✅ Trade executed successfully!'));
+                console.log(chalk.white(`📊 Pair: ${selectedToken.tradingPair}`));
+                console.log(chalk.white(`💰 Amount: ${amount}`));
+                console.log(chalk.white(`📈 Direction: ${direction === '1' ? 'BUY' : 'SELL'}`));
+                console.log(chalk.white(`⛽ Gas Used: ${result.gasUsed || 'N/A'}`));
+                console.log(chalk.white(`🧾 Transaction Hash: ${result.txHash || 'N/A'}`));
+            } else {
+                throw new Error('Trade execution returned invalid result');
+            }
             
         } catch (error) {
-            console.log(chalk.red(`❌ Trade failed: ${error.message}`));
+            console.log(chalk.red(`\n❌ Trade execution failed!`));
+            console.log(chalk.red(`💥 Error: ${error.message}`));
+            console.log(chalk.yellow(`💡 Possible reasons:`));
+            console.log(chalk.yellow(`   • No liquidity available for this trading pair`));
+            console.log(chalk.yellow(`   • Insufficient token balance`));
+            console.log(chalk.yellow(`   • Network connectivity issues`));
+            console.log(chalk.yellow(`   • Invalid token contract address`));
+            console.log(chalk.white(`🔍 Troubleshooting:`));
+            console.log(chalk.white(`   • Try a different token pair`));
+            console.log(chalk.white(`   • Check your wallet balances`));
+            console.log(chalk.white(`   • Verify token addresses are correct`));
         }
         
         await this.getUserInput('\nPress Enter to continue...');
@@ -958,6 +976,74 @@ class WorldchainTradingBot {
             }
         } catch (error) {
             console.log(chalk.red(`❌ Price monitoring failed: ${error.message}`));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    async checkPairLiquidity() {
+        if (Object.keys(this.discoveredTokens).length === 0) {
+            console.log(chalk.yellow('\n📭 No tokens discovered yet!'));
+            console.log(chalk.white('💡 Run token discovery first to find tokens in your wallets.'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        console.log(chalk.white('\n🔍 CHECK PAIR LIQUIDITY'));
+        console.log(chalk.gray('═'.repeat(50)));
+        
+        const tokens = Object.values(this.discoveredTokens);
+        
+        console.log(chalk.white('\nAvailable tokens:'));
+        tokens.forEach((token, index) => {
+            console.log(chalk.cyan(`${index + 1}. ${token.symbol} - ${token.name}`));
+        });
+        
+        const tokenChoice = await this.getUserInput('\nSelect token to check liquidity with WLD (number): ');
+        const tokenIndex = parseInt(tokenChoice) - 1;
+        
+        if (tokenIndex < 0 || tokenIndex >= tokens.length) {
+            console.log(chalk.red('❌ Invalid token selection'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        const selectedToken = tokens[tokenIndex];
+        
+        console.log(chalk.white(`\n🔍 Checking liquidity for WLD/${selectedToken.symbol} pair...`));
+        console.log(chalk.gray('─'.repeat(50)));
+        
+        try {
+            const liquidityCheck = await this.tradingEngine.checkPairLiquidity(this.WLD_ADDRESS, selectedToken.address);
+            
+            if (liquidityCheck.liquidityFound) {
+                console.log(chalk.green(`\n✅ Liquidity available for WLD/${selectedToken.symbol}!`));
+                console.log(chalk.white('\n📊 Available fee tiers:'));
+                
+                liquidityCheck.liquidityInfo.forEach(tier => {
+                    if (tier.hasLiquidity) {
+                        console.log(chalk.green(`   ✅ ${tier.feePercent}% fee tier - Liquidity available`));
+                    } else {
+                        console.log(chalk.red(`   ❌ ${tier.feePercent}% fee tier - No liquidity`));
+                    }
+                });
+                
+                console.log(chalk.white('\n💡 You can trade this pair!'));
+            } else {
+                console.log(chalk.red(`\n❌ No liquidity found for WLD/${selectedToken.symbol} pair`));
+                console.log(chalk.yellow('\n💡 This means:'));
+                console.log(chalk.yellow('   • This trading pair doesn\'t exist on Uniswap V3'));
+                console.log(chalk.yellow('   • No liquidity providers have added funds for this pair'));
+                console.log(chalk.yellow('   • You cannot trade this pair at the moment'));
+                
+                console.log(chalk.white('\n🔍 Suggestions:'));
+                console.log(chalk.white('   • Try a different token pair'));
+                console.log(chalk.white('   • Check if the token address is correct'));
+                console.log(chalk.white('   • Look for alternative trading venues'));
+            }
+            
+        } catch (error) {
+            console.log(chalk.red(`\n❌ Error checking liquidity: ${error.message}`));
         }
         
         await this.getUserInput('\nPress Enter to continue...');

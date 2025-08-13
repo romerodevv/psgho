@@ -134,6 +134,19 @@ class AdvancedTradingEngine {
     // Execute high-speed trade
     async executeSwap(wallet, tokenIn, tokenOut, amountIn, slippageTolerance = 0.5) {
         try {
+            console.log(`🔄 Executing swap: ${amountIn} tokens`);
+            
+            // First check if liquidity exists for this pair
+            const liquidityCheck = await this.checkPairLiquidity(tokenIn, tokenOut);
+            
+            if (!liquidityCheck.liquidityFound) {
+                const tokenInSymbol = tokenIn === this.WLD_ADDRESS ? 'WLD' : 'TOKEN';
+                const tokenOutSymbol = tokenOut === this.WLD_ADDRESS ? 'WLD' : 'TOKEN';
+                throw new Error(`No liquidity available for ${tokenInSymbol}/${tokenOutSymbol} pair on Worldchain. This trading pair does not exist on Uniswap V3 or has no liquidity providers.`);
+            }
+            
+            console.log(`✅ Liquidity confirmed for trading pair`);
+            
             const signer = new ethers.Wallet(wallet.privateKey, this.provider);
             
             // Get token contracts
@@ -149,11 +162,18 @@ class AdvancedTradingEngine {
             // Convert amount to proper units
             const amountInWei = ethers.parseUnits(amountIn.toString(), tokenInDecimals);
             
-            // Get quote for the swap
+            // Get quote for the swap using available fee tiers
             let bestQuote = null;
             let bestFee = 3000; // Default to 0.3%
             
-            for (const fee of this.FEE_TIERS) {
+            // Use only fee tiers that have liquidity
+            const availableFeeTiers = liquidityCheck.liquidityInfo
+                .filter(tier => tier.hasLiquidity)
+                .map(tier => tier.fee);
+            
+            const feeTiersToTry = availableFeeTiers.length > 0 ? availableFeeTiers : this.FEE_TIERS;
+            
+            for (const fee of feeTiersToTry) {
                 try {
                     const quote = await this.quoterContract.quoteExactInputSingle(
                         tokenIn,
@@ -174,8 +194,12 @@ class AdvancedTradingEngine {
             }
             
             if (!bestQuote) {
-                throw new Error('No liquidity available for this pair');
+                const tokenInSymbol = tokenIn === this.WLD_ADDRESS ? 'WLD' : 'TOKEN';
+                const tokenOutSymbol = tokenOut === this.WLD_ADDRESS ? 'WLD' : 'TOKEN';
+                throw new Error(`Unable to get price quote for ${tokenInSymbol}/${tokenOutSymbol} pair. The pair may have insufficient liquidity for this trade amount (${amountIn} tokens).`);
             }
+            
+            console.log(`💰 Best quote found at ${(bestFee / 10000).toFixed(2)}% fee tier`);
             
             // Calculate minimum amount out with slippage
             const slippageMultiplier = BigInt(Math.floor((100 - slippageTolerance) * 100));
@@ -335,6 +359,67 @@ class AdvancedTradingEngine {
     // Calculate slippage and price impact
     calculateSlippage(expectedPrice, actualPrice) {
         return ((expectedPrice - actualPrice) / expectedPrice) * 100;
+    }
+
+    // Check if liquidity exists for a trading pair
+    async checkPairLiquidity(tokenA, tokenB) {
+        try {
+            console.log(`🔍 Checking liquidity for pair...`);
+            
+            const feeTiers = [500, 3000, 10000]; // 0.05%, 0.3%, 1%
+            let liquidityFound = false;
+            const liquidityInfo = [];
+            
+            for (const fee of feeTiers) {
+                try {
+                    const quoterContract = new ethers.Contract(this.QUOTER_V2, this.QUOTER_ABI, this.provider);
+                    
+                    // Try a small test amount (0.001 tokens)
+                    const testAmount = ethers.parseUnits('0.001', 18);
+                    
+                    const quote = await quoterContract.quoteExactInputSingle.staticCall({
+                        tokenIn: tokenA,
+                        tokenOut: tokenB,
+                        fee: fee,
+                        amountIn: testAmount,
+                        sqrtPriceLimitX96: 0
+                    });
+                    
+                    if (quote && quote > 0n) {
+                        liquidityFound = true;
+                        liquidityInfo.push({
+                            fee: fee,
+                            feePercent: (fee / 10000).toFixed(2),
+                            hasLiquidity: true
+                        });
+                        console.log(`   ✅ Liquidity found at ${(fee / 10000).toFixed(2)}% fee tier`);
+                    }
+                } catch (error) {
+                    liquidityInfo.push({
+                        fee: fee,
+                        feePercent: (fee / 10000).toFixed(2),
+                        hasLiquidity: false,
+                        error: error.message
+                    });
+                    console.log(`   ❌ No liquidity at ${(fee / 10000).toFixed(2)}% fee tier`);
+                }
+            }
+            
+            return {
+                liquidityFound,
+                liquidityInfo,
+                tokenA,
+                tokenB
+            };
+        } catch (error) {
+            console.error('Error checking pair liquidity:', error.message);
+            return {
+                liquidityFound: false,
+                error: error.message,
+                tokenA,
+                tokenB
+            };
+        }
     }
 
     // Get token information
