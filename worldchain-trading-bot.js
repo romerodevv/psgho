@@ -8,6 +8,7 @@ const axios = require('axios');
 const chalk = require('chalk');
 const figlet = require('figlet');
 const AdvancedTradingEngine = require('./trading-engine');
+const SinclaveEnhancedTradingEngine = require('./sinclave-enhanced-engine');
 const TokenDiscoveryService = require('./token-discovery');
 const TradingStrategy = require('./trading-strategy');
 require('dotenv').config();
@@ -41,6 +42,7 @@ class WorldchainTradingBot {
         
         // Initialize advanced modules
         this.tradingEngine = new AdvancedTradingEngine(this.provider, this.config);
+        this.sinclaveEngine = new SinclaveEnhancedTradingEngine(this.provider, this.config);
         this.tokenDiscovery = new TokenDiscoveryService(this.provider, this.config);
         this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config);
         
@@ -720,12 +722,13 @@ class WorldchainTradingBot {
             console.log(chalk.white('\n📈 TRADING OPERATIONS'));
             console.log(chalk.gray('─'.repeat(30)));
             console.log(chalk.cyan('1. 🔄 Execute Trade'));
-            console.log(chalk.cyan('2. 📊 View Trading Pairs'));
-            console.log(chalk.cyan('3. 🔍 Check Pair Liquidity'));
-            console.log(chalk.cyan('4. ⚡ High-Speed Trading Mode'));
-            console.log(chalk.cyan('5. 📈 Price Monitoring'));
-            console.log(chalk.cyan('6. 📋 Trade History'));
-            console.log(chalk.red('7. ⬅️  Back to Main Menu'));
+            console.log(chalk.cyan('2. 🚀 Sinclave Enhanced Trade'));
+            console.log(chalk.cyan('3. 📊 View Trading Pairs'));
+            console.log(chalk.cyan('4. 🔍 Check Pair Liquidity'));
+            console.log(chalk.cyan('5. ⚡ High-Speed Trading Mode'));
+            console.log(chalk.cyan('6. 📈 Price Monitoring'));
+            console.log(chalk.cyan('7. 📋 Trade History'));
+            console.log(chalk.red('8. ⬅️  Back to Main Menu'));
             
             const choice = await this.getUserInput('\nSelect option: ');
             
@@ -734,21 +737,24 @@ class WorldchainTradingBot {
                     await this.executeTrade();
                     break;
                 case '2':
-                    await this.viewTradingPairs();
+                    await this.sinclaveEnhancedTrade();
                     break;
                 case '3':
-                    await this.checkPairLiquidity();
+                    await this.viewTradingPairs();
                     break;
                 case '4':
-                    await this.highSpeedTradingMode();
+                    await this.checkPairLiquidity();
                     break;
                 case '5':
-                    await this.priceMonitoring();
+                    await this.highSpeedTradingMode();
                     break;
                 case '6':
-                    await this.tradeHistory();
+                    await this.priceMonitoring();
                     break;
                 case '7':
+                    await this.tradeHistory();
+                    break;
+                case '8':
                     return;
                 default:
                     console.log(chalk.red('❌ Invalid option'));
@@ -976,6 +982,152 @@ class WorldchainTradingBot {
             }
         } catch (error) {
             console.log(chalk.red(`❌ Price monitoring failed: ${error.message}`));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    async sinclaveEnhancedTrade() {
+        if (Object.keys(this.wallets).length === 0) {
+            console.log(chalk.yellow('\n📭 No wallets available!'));
+            console.log(chalk.white('💡 Create a wallet first from the Wallet Management menu.'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        if (Object.keys(this.discoveredTokens).length === 0) {
+            console.log(chalk.yellow('\n📭 No tokens discovered yet!'));
+            console.log(chalk.white('💡 Run token discovery first to find tokens in your wallets.'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        console.log(chalk.white('\n🚀 SINCLAVE ENHANCED TRADE'));
+        console.log(chalk.gray('═'.repeat(50)));
+        console.log(chalk.yellow('🎯 Using proven patterns from sinclave.js for optimal execution'));
+        console.log(chalk.cyan('✅ Optimized RPC routing'));
+        console.log(chalk.cyan('✅ Proven contract addresses'));
+        console.log(chalk.cyan('✅ Advanced routing fixes'));
+        console.log(chalk.cyan('✅ Gas optimization'));
+        console.log(chalk.cyan('✅ Performance metrics'));
+        
+        // Select wallet
+        const walletNames = Object.keys(this.wallets);
+        console.log(chalk.white('\n💼 Available wallets:'));
+        walletNames.forEach((name, index) => {
+            console.log(chalk.cyan(`${index + 1}. ${name} - ${this.wallets[name].address}`));
+        });
+        
+        const walletChoice = await this.getUserInput('\nSelect wallet (number): ');
+        const walletIndex = parseInt(walletChoice) - 1;
+        
+        if (walletIndex < 0 || walletIndex >= walletNames.length) {
+            console.log(chalk.red('❌ Invalid wallet selection'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        const selectedWallet = this.wallets[walletNames[walletIndex]];
+        
+        // Select token
+        const tokens = Object.values(this.discoveredTokens);
+        console.log(chalk.white('\n🪙 Available tokens:'));
+        tokens.forEach((token, index) => {
+            console.log(chalk.cyan(`${index + 1}. ${token.symbol} - ${token.name}`));
+        });
+        
+        const tokenChoice = await this.getUserInput('\nSelect token to trade with WLD (number): ');
+        const tokenIndex = parseInt(tokenChoice) - 1;
+        
+        if (tokenIndex < 0 || tokenIndex >= tokens.length) {
+            console.log(chalk.red('❌ Invalid token selection'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        const selectedToken = tokens[tokenIndex];
+        
+        // Select direction
+        console.log(chalk.white('\n📈 Trading direction:'));
+        console.log(chalk.cyan('1. BUY - WLD → ' + selectedToken.symbol));
+        console.log(chalk.cyan('2. SELL - ' + selectedToken.symbol + ' → WLD'));
+        
+        const direction = await this.getUserInput('\nSelect direction (1 or 2): ');
+        
+        if (direction !== '1' && direction !== '2') {
+            console.log(chalk.red('❌ Invalid direction'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        // Enter amount
+        const amount = await this.getUserInput('\nEnter amount to trade: ');
+        
+        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+            console.log(chalk.red('❌ Invalid amount'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        console.log(chalk.white('\n🚀 EXECUTING SINCLAVE ENHANCED TRADE...'));
+        console.log(chalk.gray('═'.repeat(50)));
+        
+        try {
+            // Determine token addresses for the swap
+            const tokenIn = direction === '1' ? this.WLD_ADDRESS : selectedToken.address;
+            const tokenOut = direction === '1' ? selectedToken.address : this.WLD_ADDRESS;
+            
+            // Execute the enhanced trade using sinclave patterns
+            const result = await this.sinclaveEngine.executeOptimizedSwap(
+                selectedWallet,
+                tokenIn,
+                tokenOut,
+                parseFloat(amount),
+                this.config.slippage || 0.5
+            );
+            
+            if (result && result.success) {
+                console.log(chalk.green('\n🎉 SINCLAVE ENHANCED TRADE SUCCESS!'));
+                console.log(chalk.white(`📊 Pair: ${direction === '1' ? 'WLD' : selectedToken.symbol} → ${direction === '1' ? selectedToken.symbol : 'WLD'}`));
+                console.log(chalk.white(`💰 Amount: ${amount}`));
+                console.log(chalk.white(`📈 Direction: ${direction === '1' ? 'BUY' : 'SELL'}`));
+                console.log(chalk.white(`⛽ Gas Used: ${result.gasUsed || 'N/A'}`));
+                console.log(chalk.white(`🧾 Transaction Hash: ${result.txHash || 'N/A'}`));
+                console.log(chalk.white(`⚡ Execution Time: ${result.executionTime}ms`));
+                console.log(chalk.white(`📊 Exchange Rate: ${result.exchangeRate ? result.exchangeRate.toFixed(6) : 'N/A'}`));
+                console.log(chalk.white(`🔗 WorldScan: https://worldscan.org/tx/${result.txHash}`));
+                
+                if (result.optimizations) {
+                    console.log(chalk.cyan('\n✨ OPTIMIZATIONS APPLIED:'));
+                    console.log(chalk.cyan(`   🌐 Public RPC Used: ${result.optimizations.publicRPCUsed ? '✅' : '❌'}`));
+                    console.log(chalk.cyan(`   🔧 Routing Fix Applied: ${result.optimizations.routingFixApplied ? '✅' : '❌'}`));
+                    console.log(chalk.cyan(`   ⛽ Gas Optimized: ${result.optimizations.gasOptimized ? '✅' : '❌'}`));
+                    console.log(chalk.cyan(`   🚀 SDK Used: ${result.optimizations.sdkUsed}`));
+                }
+                
+                // Show performance metrics
+                const metrics = this.sinclaveEngine.getMetrics();
+                console.log(chalk.blue('\n📊 PERFORMANCE METRICS:'));
+                console.log(chalk.blue(`   📈 Success Rate: ${metrics.successRate}`));
+                console.log(chalk.blue(`   ⚡ Average Execution: ${metrics.averageExecutionTime}`));
+                console.log(chalk.blue(`   🔢 Total Trades: ${metrics.totalTrades}`));
+                
+            } else {
+                throw new Error(result.error || 'Trade execution returned invalid result');
+            }
+            
+        } catch (error) {
+            console.log(chalk.red(`\n❌ SINCLAVE ENHANCED TRADE FAILED!`));
+            console.log(chalk.red(`💥 Error: ${error.message}`));
+            console.log(chalk.yellow(`💡 Possible reasons:`));
+            console.log(chalk.yellow(`   • No liquidity available for this trading pair`));
+            console.log(chalk.yellow(`   • Insufficient token balance`));
+            console.log(chalk.yellow(`   • Network connectivity issues`));
+            console.log(chalk.yellow(`   • Invalid token contract address`));
+            console.log(chalk.white(`🔍 Troubleshooting:`));
+            console.log(chalk.white(`   • Try the regular trade execution first`));
+            console.log(chalk.white(`   • Check pair liquidity before trading`));
+            console.log(chalk.white(`   • Verify your wallet balances`));
         }
         
         await this.getUserInput('\nPress Enter to continue...');
