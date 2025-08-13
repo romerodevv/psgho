@@ -725,10 +725,11 @@ class WorldchainTradingBot {
             console.log(chalk.cyan('2. 🚀 Sinclave Enhanced Trade'));
             console.log(chalk.cyan('3. 📊 View Trading Pairs'));
             console.log(chalk.cyan('4. 🔍 Check Pair Liquidity'));
-            console.log(chalk.cyan('5. ⚡ High-Speed Trading Mode'));
-            console.log(chalk.cyan('6. 📈 Price Monitoring'));
-            console.log(chalk.cyan('7. 📋 Trade History'));
-            console.log(chalk.red('8. ⬅️  Back to Main Menu'));
+            console.log(chalk.cyan('5. 💡 Suggest Valid Trading Pairs'));
+            console.log(chalk.cyan('6. ⚡ High-Speed Trading Mode'));
+            console.log(chalk.cyan('7. 📈 Price Monitoring'));
+            console.log(chalk.cyan('8. 📋 Trade History'));
+            console.log(chalk.red('9. ⬅️  Back to Main Menu'));
             
             const choice = await this.getUserInput('\nSelect option: ');
             
@@ -746,15 +747,18 @@ class WorldchainTradingBot {
                     await this.checkPairLiquidity();
                     break;
                 case '5':
-                    await this.highSpeedTradingMode();
+                    await this.suggestValidTradingPairs();
                     break;
                 case '6':
-                    await this.priceMonitoring();
+                    await this.highSpeedTradingMode();
                     break;
                 case '7':
-                    await this.tradeHistory();
+                    await this.priceMonitoring();
                     break;
                 case '8':
+                    await this.tradeHistory();
+                    break;
+                case '9':
                     return;
                 default:
                     console.log(chalk.red('❌ Invalid option'));
@@ -819,18 +823,42 @@ class WorldchainTradingBot {
         const direction = await this.getUserInput('\nSelect direction: ');
         const amount = await this.getUserInput('Enter amount: ');
         
-        if (!amount || isNaN(parseFloat(amount))) {
-            console.log(chalk.red('❌ Invalid amount'));
+        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+            console.log(chalk.red('❌ Invalid amount. Please enter a positive number greater than 0.'));
             await this.getUserInput('\nPress Enter to continue...');
             return;
         }
+        
+        const parsedAmount = parseFloat(amount);
+        
+        // Pre-validate liquidity before attempting trade
+        console.log(chalk.yellow('\n🔍 Pre-validating trading pair liquidity...'));
+        
+        const tokenIn = direction === '1' ? this.WLD_ADDRESS : selectedToken.address;
+        const tokenOut = direction === '1' ? selectedToken.address : this.WLD_ADDRESS;
+        
+        const liquidityCheck = await this.tradingEngine.checkPairLiquidity(tokenIn, tokenOut);
+        
+        if (!liquidityCheck.liquidityFound) {
+            console.log(chalk.red(`\n❌ No liquidity found for ${direction === '1' ? 'WLD' : selectedToken.symbol}/${direction === '1' ? selectedToken.symbol : 'WLD'} pair!`));
+            console.log(chalk.yellow('\n💡 This trading pair does not exist on Uniswap V3 or has no liquidity providers.'));
+            console.log(chalk.white('\n🔍 Suggestions:'));
+            console.log(chalk.white('   • Try the "Check Pair Liquidity" feature first'));
+            console.log(chalk.white('   • Look for tokens that have active liquidity'));
+            console.log(chalk.white('   • Consider using major tokens like ETH, USDC, or popular DeFi tokens'));
+            console.log(chalk.white('   • Check if this token has liquidity on other DEXs'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        console.log(chalk.green('✅ Liquidity confirmed! Proceeding with trade...'));
         
         // Execute trade simulation
         console.log(chalk.white('\n⚡ EXECUTING TRADE...'));
         console.log(chalk.gray('═'.repeat(40)));
         
         try {
-            const result = await this.simulateTrade(selectedWallet, selectedToken, direction === '1', parseFloat(amount));
+            const result = await this.simulateTrade(selectedWallet, selectedToken, direction === '1', parsedAmount);
             
             if (result && result.success !== false) {
                 console.log(chalk.green('\n✅ Trade executed successfully!'));
@@ -1133,10 +1161,75 @@ class WorldchainTradingBot {
         await this.getUserInput('\nPress Enter to continue...');
     }
 
+    async suggestValidTradingPairs() {
+        console.log(chalk.white('\n🔍 FINDING VALID TRADING PAIRS'));
+        console.log(chalk.gray('═'.repeat(50)));
+        console.log(chalk.yellow('Checking common token pairs for liquidity...'));
+        
+        // Common tokens on Worldchain that might have liquidity (from sinclave.js analysis)
+        const commonTokens = [
+            { symbol: 'ORO', address: '0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63', name: 'ORO Token' }, // From sinclave.js
+            { symbol: 'WETH', address: '0x4200000000000000000000000000000000000006', name: 'Wrapped Ether' }, // Common on L2s
+            { symbol: 'USDC', address: '0x79A02482A880bCE3F13e09Da970dC34db4CD24d1', name: 'USD Coin' }, // Common stablecoin
+        ];
+        
+        const validPairs = [];
+        
+        for (const token of commonTokens) {
+            try {
+                console.log(chalk.gray(`Checking WLD/${token.symbol}...`));
+                const liquidityCheck = await this.tradingEngine.checkPairLiquidity(this.WLD_ADDRESS, token.address);
+                
+                if (liquidityCheck.liquidityFound) {
+                    validPairs.push({
+                        ...token,
+                        liquidityInfo: liquidityCheck.liquidityInfo.filter(tier => tier.hasLiquidity)
+                    });
+                    console.log(chalk.green(`   ✅ WLD/${token.symbol} has liquidity!`));
+                } else {
+                    console.log(chalk.red(`   ❌ WLD/${token.symbol} no liquidity`));
+                }
+            } catch (error) {
+                console.log(chalk.gray(`   ⚠️ WLD/${token.symbol} check failed`));
+            }
+        }
+        
+        console.log(chalk.white('\n📊 RESULTS:'));
+        console.log(chalk.gray('─'.repeat(30)));
+        
+        if (validPairs.length > 0) {
+            console.log(chalk.green(`Found ${validPairs.length} valid trading pairs:`));
+            
+            validPairs.forEach((pair, index) => {
+                console.log(chalk.cyan(`${index + 1}. WLD/${pair.symbol} (${pair.name})`));
+                console.log(chalk.white(`   Address: ${pair.address}`));
+                console.log(chalk.white(`   Fee tiers: ${pair.liquidityInfo.map(t => t.feePercent + '%').join(', ')}`));
+            });
+            
+            console.log(chalk.white('\n💡 You can trade these pairs safely!'));
+            console.log(chalk.white('Add these token addresses to your discovered tokens to trade them.'));
+            
+        } else {
+            console.log(chalk.red('❌ No valid trading pairs found with WLD.'));
+            console.log(chalk.yellow('\n💡 This could mean:'));
+            console.log(chalk.yellow('   • Worldchain may not have active DEX liquidity yet'));
+            console.log(chalk.yellow('   • The tokens may use different DEXs or protocols'));
+            console.log(chalk.yellow('   • Liquidity might be on centralized exchanges instead'));
+            
+            console.log(chalk.white('\n🔍 Try:'));
+            console.log(chalk.white('   • Check WorldScan for active token contracts'));
+            console.log(chalk.white('   • Look for tokens with recent transaction activity'));
+            console.log(chalk.white('   • Use the Sinclave Enhanced Trade for better routing'));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
     async checkPairLiquidity() {
         if (Object.keys(this.discoveredTokens).length === 0) {
             console.log(chalk.yellow('\n📭 No tokens discovered yet!'));
             console.log(chalk.white('💡 Run token discovery first to find tokens in your wallets.'));
+            console.log(chalk.white('Or try "Suggest Valid Trading Pairs" to find tokens with liquidity.'));
             await this.getUserInput('\nPress Enter to continue...');
             return;
         }
