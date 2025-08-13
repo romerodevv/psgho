@@ -346,9 +346,10 @@ class SinclaveEnhancedTradingEngine {
     // Get HoldStation SDK quote (like sinclave.js)
     async getHoldStationQuote(tokenIn, tokenOut, amountIn, receiver) {
         try {
-            console.log('🚀 Initializing HoldStation SDK...');
+            console.log('🚀 Attempting to initialize HoldStation SDK...');
             
-            // Dynamic import for HoldStation SDK
+            // Try to dynamically import HoldStation SDK
+            // Note: These packages need to be installed manually as they may not be in public npm registry
             const { Client, Multicall3 } = await import("@holdstation/worldchain-ethers-v6");
             const { 
                 config, 
@@ -418,8 +419,17 @@ class SinclaveEnhancedTradingEngine {
             };
 
         } catch (error) {
-            console.log(`❌ HoldStation SDK error: ${error.message}`);
-            throw new Error(`HoldStation SDK unavailable or failed: ${error.message}`);
+            // More specific error handling
+            if (error.code === 'MODULE_NOT_FOUND' || error.message.includes('Cannot resolve module')) {
+                console.log('⚠️ HoldStation SDK packages not installed');
+                console.log('💡 To use HoldStation SDK, you need to install the packages manually:');
+                console.log('   npm install @holdstation/worldchain-sdk');
+                console.log('   npm install @holdstation/worldchain-ethers-v6');
+                throw new Error('HoldStation SDK packages not found - install manually or use fallback');
+            } else {
+                console.log(`❌ HoldStation SDK error: ${error.message}`);
+                throw new Error(`HoldStation SDK failed: ${error.message}`);
+            }
         }
     }
     
