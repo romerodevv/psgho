@@ -11,6 +11,7 @@ const AdvancedTradingEngine = require('./trading-engine');
 const SinclaveEnhancedTradingEngine = require('./sinclave-enhanced-engine');
 const TokenDiscoveryService = require('./token-discovery');
 const TradingStrategy = require('./trading-strategy');
+const StrategyBuilder = require('./strategy-builder');
 require('dotenv').config();
 
 class WorldchainTradingBot {
@@ -44,6 +45,7 @@ class WorldchainTradingBot {
         this.tradingEngine = new AdvancedTradingEngine(this.provider, this.config);
         this.sinclaveEngine = new SinclaveEnhancedTradingEngine(this.provider, this.config);
         this.tokenDiscovery = new TokenDiscoveryService(this.provider, this.config);
+        this.strategyBuilder = new StrategyBuilder(this.tradingEngine, this.sinclaveEngine, this.config);
         
         // Initialize trading strategy with both engines
         this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config, this.sinclaveEngine);
