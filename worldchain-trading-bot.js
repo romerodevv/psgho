@@ -130,9 +130,10 @@ class WorldchainTradingBot {
         console.log(chalk.cyan('2. 🔍 Token Discovery & Portfolio'));
         console.log(chalk.cyan('3. 📈 Trading Operations'));
         console.log(chalk.cyan('4. 🎯 Strategy Management'));
-        console.log(chalk.cyan('5. ⚙️  Configuration'));
-        console.log(chalk.cyan('6. 📊 Portfolio Overview'));
-        console.log(chalk.red('7. 🚪 Exit'));
+        console.log(chalk.cyan('5. 🏗️  Strategy Builder (Custom DIP/Profit)'));
+        console.log(chalk.cyan('6. ⚙️  Configuration'));
+        console.log(chalk.cyan('7. 📊 Portfolio Overview'));
+        console.log(chalk.red('8. 🚪 Exit'));
         console.log(chalk.gray('─'.repeat(30)));
     }
 
@@ -2119,12 +2120,15 @@ class WorldchainTradingBot {
                     await this.strategyManagementMenu();
                     break;
                 case '5':
-                    await this.configurationMenu();
+                    await this.strategyBuilderMenu();
                     break;
                 case '6':
-                    await this.portfolioSummary();
+                    await this.configurationMenu();
                     break;
                 case '7':
+                    await this.portfolioSummary();
+                    break;
+                case '8':
                     console.log(chalk.green('\n👋 Thank you for using WorldChain Trading Bot!'));
                     console.log(chalk.yellow('💡 Remember to keep your private keys secure!'));
                     
@@ -2132,6 +2136,15 @@ class WorldchainTradingBot {
                     if (this.tradingStrategy.isRunning) {
                         console.log(chalk.yellow('🛑 Stopping trading strategy...'));
                         await this.tradingStrategy.stopStrategy();
+                    }
+                    
+                    // Stop all custom strategies
+                    const activeCustomStrategies = this.strategyBuilder.getAllStrategies().filter(s => s.isActive);
+                    if (activeCustomStrategies.length > 0) {
+                        console.log(chalk.yellow(`🛑 Stopping ${activeCustomStrategies.length} custom strategies...`));
+                        for (const strategy of activeCustomStrategies) {
+                            this.strategyBuilder.stopStrategy(strategy.id);
+                        }
                     }
                     
                     this.rl.close();
