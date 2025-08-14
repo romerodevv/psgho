@@ -59,6 +59,9 @@ class WorldchainTradingBot {
         // Auto-track discovered tokens
         this.setupPriceDatabaseIntegration();
         
+        // Start background price monitoring
+        this.startPriceMonitoring();
+        
         // Initialize trading strategy with both engines
         this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config, this.sinclaveEngine);
         this.setupStrategyEventListeners();
@@ -73,6 +76,35 @@ class WorldchainTradingBot {
             input: process.stdin,
             output: process.stdout
         });
+    }
+    
+    // Setup price database integration with token discovery
+    setupPriceDatabaseIntegration() {
+        // Auto-track discovered tokens
+        const originalDiscoverTokens = this.tokenDiscovery.discoverTokens;
+        this.tokenDiscovery.discoverTokens = async (walletAddress) => {
+            const tokens = await originalDiscoverTokens.call(this.tokenDiscovery, walletAddress);
+            
+            // Add discovered tokens to price tracking
+            for (const [address, tokenInfo] of Object.entries(tokens)) {
+                this.priceDatabase.addToken(address, tokenInfo);
+            }
+            
+            return tokens;
+        };
+    }
+    
+    // Start price monitoring for discovered tokens
+    startPriceMonitoring() {
+        // Add existing discovered tokens to price tracking
+        for (const [address, tokenInfo] of Object.entries(this.discoveredTokens)) {
+            this.priceDatabase.addToken(address, tokenInfo);
+        }
+        
+        // Start background monitoring
+        this.priceDatabase.startBackgroundMonitoring();
+        
+        console.log(`🚀 Started price monitoring for ${Object.keys(this.discoveredTokens).length} discovered tokens`);
     }
 
     loadConfig() {
@@ -143,9 +175,10 @@ class WorldchainTradingBot {
         console.log(chalk.cyan('3. 📈 Trading Operations'));
         console.log(chalk.cyan('4. 🎯 Strategy Management'));
         console.log(chalk.cyan('5. 🏗️  Strategy Builder (Custom DIP/Profit)'));
-        console.log(chalk.cyan('6. ⚙️  Configuration'));
-        console.log(chalk.cyan('7. 📊 Portfolio Overview'));
-        console.log(chalk.red('8. 🚪 Exit'));
+        console.log(chalk.cyan('6. 🎯 Price Triggers (Buy/Sell Automation)'));
+        console.log(chalk.cyan('7. ⚙️  Configuration'));
+        console.log(chalk.cyan('8. 📊 Portfolio Overview'));
+        console.log(chalk.red('9. 🚪 Exit'));
         console.log(chalk.gray('─'.repeat(30)));
     }
 
@@ -2162,12 +2195,15 @@ class WorldchainTradingBot {
                     await this.strategyBuilderMenu();
                     break;
                 case '6':
-                    await this.configurationMenu();
+                    await this.priceTriggersMenu();
                     break;
                 case '7':
-                    await this.portfolioSummary();
+                    await this.configurationMenu();
                     break;
                 case '8':
+                    await this.portfolioSummary();
+                    break;
+                case '9':
                     console.log(chalk.green('\n👋 Thank you for using WorldChain Trading Bot!'));
                     console.log(chalk.yellow('💡 Remember to keep your private keys secure!'));
                     
@@ -2191,6 +2227,63 @@ class WorldchainTradingBot {
                     break;
                 default:
                     console.log(chalk.red('❌ Invalid option. Please try again.'));
+                    await this.sleep(1500);
+            }
+        }
+    }
+
+    // Price Triggers Menu (NEW - Buy/Sell Automation)
+    async priceTriggersMenu() {
+        while (true) {
+            console.clear();
+            console.log('🎯 PRICE TRIGGERS - Automated Buy/Sell Orders');
+            console.log('════════════════════════════════════════════════════════════');
+            
+            const status = this.priceDatabase.getStatus();
+            console.log(`📊 Price Monitoring: ${status.isRunning ? '🟢 ACTIVE' : '🔴 STOPPED'}`);
+            console.log(`🪙 Tracked Tokens: ${status.trackedTokens}`);
+            console.log(`🎯 Active Triggers: ${status.activeTriggers}/${status.totalTriggers}`);
+            console.log(`📈 Total Price Points: ${status.totalPricePoints}`);
+            console.log('');
+            
+            console.log('1. Create Buy Trigger');
+            console.log('2. Create Sell Trigger');
+            console.log('3. View Active Triggers');
+            console.log('4. View Price Database Status');
+            console.log('5. Manage Triggers (Edit/Delete)');
+            console.log('6. Quick Trigger Commands');
+            console.log('7. Price Statistics');
+            console.log('8. Back to Main Menu');
+            console.log('');
+            
+            const choice = await this.getUserInput('Select option: ');
+            
+            switch (choice) {
+                case '1':
+                    await this.createBuyTrigger();
+                    break;
+                case '2':
+                    await this.createSellTrigger();
+                    break;
+                case '3':
+                    await this.viewActiveTriggers();
+                    break;
+                case '4':
+                    await this.viewPriceDatabaseStatus();
+                    break;
+                case '5':
+                    await this.manageTriggers();
+                    break;
+                case '6':
+                    await this.quickTriggerCommands();
+                    break;
+                case '7':
+                    await this.viewPriceStatistics();
+                    break;
+                case '8':
+                    return;
+                default:
+                    console.log(chalk.red('❌ Invalid option'));
                     await this.sleep(1500);
             }
         }
