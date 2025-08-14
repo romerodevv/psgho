@@ -2195,9 +2195,10 @@ class WorldchainTradingBot {
             console.log('3. ▶️  Start Strategy');
             console.log('4. ⏹️  Stop Strategy');
             console.log('5. 🗑️  Delete Strategy');
-            console.log('6. 📊 Strategy Statistics');
-            console.log('7. 🔙 Back to Main Menu');
-            console.log('────────────────────────────────────────────────────────────');
+                    console.log('6. 📊 Strategy Statistics');
+        console.log('7. ⚡ Quick Console Commands');
+        console.log('8. 🔙 Back to Main Menu');
+        console.log('────────────────────────────────────────────────────────────');
 
             const choice = await this.getUserInput('Select option: ');
 
@@ -2221,6 +2222,9 @@ class WorldchainTradingBot {
                     await this.viewStrategyStatistics();
                     break;
                 case '7':
+                    await this.quickConsoleCommands();
+                    break;
+                case '8':
                     return;
                 default:
                     console.log('❌ Invalid option. Please try again.');
