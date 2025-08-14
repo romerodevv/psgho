@@ -184,27 +184,67 @@ class StrategyBuilder extends EventEmitter {
                 await this.checkForDipOpportunity(strategy, priceHistory, currentPrice);
             }
             
-            // Periodic status update
+            // Brief status update every 2 checks (~10 seconds)
+            if (activeState.checksPerformed % 2 === 0) {
+                const timeRunning = Math.floor((Date.now() - activeState.startTime) / 1000);
+                
+                if (openPositions.length === 0) {
+                    // Show brief DIP waiting status
+                    if (priceHistory.length >= 2) {
+                        const highestPrice = Math.max(...priceHistory.map(p => p.price));
+                        const currentDrop = ((highestPrice - currentPrice) / highestPrice) * 100;
+                        const dipTriggerPrice = highestPrice * (1 - strategy.dipThreshold / 100);
+                        
+                        console.log(`⏳ ${strategy.name}: Waiting for DIP | Current: ${currentPrice.toFixed(8)} | Need: ≤${dipTriggerPrice.toFixed(8)} | Drop: ${currentDrop.toFixed(2)}%/${strategy.dipThreshold}% | Runtime: ${timeRunning}s`);
+                    } else {
+                        console.log(`📊 ${strategy.name}: Building price history (${priceHistory.length}/2) | Current: ${currentPrice.toFixed(8)} WLD | Runtime: ${timeRunning}s`);
+                    }
+                } else {
+                    // Show brief position status
+                    const totalWLD = openPositions.reduce((sum, pos) => sum + pos.entryAmountWLD, 0);
+                    const totalTokens = openPositions.reduce((sum, pos) => sum + pos.entryAmountToken, 0);
+                    const averagePrice = totalWLD / totalTokens;
+                    const targetPrice = averagePrice * (1 + strategy.profitTarget / 100);
+                    const priceVsAverage = ((currentPrice - averagePrice) / averagePrice) * 100;
+                    
+                    const buyStatus = currentPrice <= averagePrice ? '✅ WILL BUY' : '⏳ HOLD ONLY';
+                    const sellStatus = currentPrice >= targetPrice ? '🚀 SELL NOW' : `📈 Need +${(((targetPrice - currentPrice) / currentPrice) * 100).toFixed(1)}%`;
+                    
+                    console.log(`💼 ${strategy.name}: ${openPositions.length} pos | Avg: ${averagePrice.toFixed(8)} | Current: ${currentPrice.toFixed(8)} (${priceVsAverage >= 0 ? '+' : ''}${priceVsAverage.toFixed(1)}%) | ${buyStatus} | ${sellStatus}`);
+                }
+            }
+            
+            // Detailed status update (every 10 checks = ~50 seconds)
             if (activeState.checksPerformed % 10 === 0) {
-                console.log(`📊 Strategy ${strategy.name} status:`);
-                console.log(`   🔄 Checks: ${activeState.checksPerformed}`);
-                console.log(`   💰 Positions: ${openPositions.length} open`);
-                console.log(`   📈 Current Price: ${currentPrice.toFixed(8)} WLD per token`);
+                console.log(`\n📊 STRATEGY STATUS: ${strategy.name}`);
+                console.log(`════════════════════════════════════════════════════════════`);
+                console.log(`   🔄 Checks Performed: ${activeState.checksPerformed}`);
+                console.log(`   💰 Open Positions: ${openPositions.length}`);
+                console.log(`   📈 Current Price: ${currentPrice.toFixed(8)} WLD per ${strategy.targetTokenSymbol}`);
                 
                 if (openPositions.length === 0) {
                     // No positions yet - show DIP detection status
+                    console.log(`   🎯 WAITING FOR INITIAL DIP BUY:`);
+                    
                     if (priceHistory.length >= 2) {
                         const highestPrice = Math.max(...priceHistory.map(p => p.price));
                         const currentDrop = ((highestPrice - currentPrice) / highestPrice) * 100;
                         const remainingDrop = strategy.dipThreshold - currentDrop;
+                        const dipTriggerPrice = highestPrice * (1 - strategy.dipThreshold / 100);
+                        
+                        console.log(`   📊 Highest Price (${strategy.dipTimeframe/1000}s): ${highestPrice.toFixed(8)} WLD`);
+                        console.log(`   📉 DIP Trigger Price: ${dipTriggerPrice.toFixed(8)} WLD (${strategy.dipThreshold}% drop)`);
+                        console.log(`   📈 Current Drop: ${currentDrop.toFixed(2)}%`);
                         
                         if (remainingDrop > 0) {
-                            console.log(`   📉 Need ${remainingDrop.toFixed(2)}% more drop for INITIAL DIP buy (${currentDrop.toFixed(2)}% / ${strategy.dipThreshold}%)`);
+                            console.log(`   ⏳ Need ${remainingDrop.toFixed(2)}% MORE drop to trigger initial buy`);
+                            console.log(`   🎯 Waiting for price ≤ ${dipTriggerPrice.toFixed(8)} WLD`);
                         } else {
-                            console.log(`   ⚠️ DIP threshold reached but no buy executed - checking conditions...`);
+                            console.log(`   ✅ DIP threshold REACHED! Checking buy conditions...`);
                         }
                     } else {
-                        console.log(`   📊 Building price history... (${priceHistory.length}/2 points)`);
+                        console.log(`   📊 Building price history... (${priceHistory.length}/2 data points needed)`);
+                        console.log(`   ⏳ Monitoring for ${strategy.dipTimeframe/1000}s to detect price patterns`);
                     }
                 } else {
                     // Show average price strategy status
@@ -213,24 +253,49 @@ class StrategyBuilder extends EventEmitter {
                     const averagePrice = totalWLD / totalTokens;
                     const targetPrice = averagePrice * (1 + strategy.profitTarget / 100);
                     
-                    console.log(`   📊 AVERAGE PRICE STRATEGY:`);
-                    console.log(`      💰 Total Investment: ${totalWLD.toFixed(6)} WLD`);
-                    console.log(`      📊 Average Price: ${averagePrice.toFixed(8)} WLD per token`);
-                    console.log(`      🎯 Target Price: ${targetPrice.toFixed(8)} WLD per token`);
+                    console.log(`   💼 MANAGING ${openPositions.length} POSITIONS:`);
+                    console.log(`   💰 Total Investment: ${totalWLD.toFixed(6)} WLD`);
+                    console.log(`   📊 Average Price: ${averagePrice.toFixed(8)} WLD per ${strategy.targetTokenSymbol}`);
+                    console.log(`   🎯 Profit Target: ${targetPrice.toFixed(8)} WLD per ${strategy.targetTokenSymbol}`);
+                    
+                    // Price comparison analysis
+                    const priceVsAverage = ((currentPrice - averagePrice) / averagePrice) * 100;
+                    const priceVsTarget = ((currentPrice - targetPrice) / targetPrice) * 100;
+                    
+                    console.log(`   📈 Price vs Average: ${priceVsAverage >= 0 ? '+' : ''}${priceVsAverage.toFixed(2)}%`);
                     
                     if (currentPrice <= averagePrice) {
-                        console.log(`      ✅ Current price BELOW average - will buy on next ${strategy.dipThreshold}% DIP`);
+                        console.log(`   ✅ WILL BUY on next ${strategy.dipThreshold}% DIP (price below average)`);
+                        
+                        // Show DIP trigger info for additional buys
+                        if (priceHistory.length >= 2) {
+                            const highestPrice = Math.max(...priceHistory.map(p => p.price));
+                            const currentDrop = ((highestPrice - currentPrice) / highestPrice) * 100;
+                            const dipTriggerPrice = highestPrice * (1 - strategy.dipThreshold / 100);
+                            const remainingDrop = strategy.dipThreshold - currentDrop;
+                            
+                            if (remainingDrop > 0) {
+                                console.log(`   📉 Next DIP buy at: ${dipTriggerPrice.toFixed(8)} WLD (need ${remainingDrop.toFixed(2)}% more drop)`);
+                            } else {
+                                console.log(`   🚨 DIP DETECTED! Ready to buy more and improve average`);
+                            }
+                        }
                     } else {
-                        console.log(`      ⏳ Current price ABOVE average - holding positions, no buying`);
+                        console.log(`   ⏳ HOLDING ONLY (price above average - no buying)`);
+                        console.log(`   📊 Will buy again when price drops to: ${averagePrice.toFixed(8)} WLD`);
                     }
                     
                     if (currentPrice >= targetPrice) {
-                        console.log(`      🚀 PROFIT TARGET REACHED - will sell all positions!`);
+                        console.log(`   🚀 PROFIT TARGET REACHED! Will sell ALL positions`);
+                        console.log(`   💹 Expected profit: ${priceVsTarget.toFixed(2)}% above target`);
                     } else {
                         const profitNeeded = ((targetPrice - currentPrice) / currentPrice) * 100;
-                        console.log(`      📈 Need ${profitNeeded.toFixed(2)}% more gain for profit target`);
+                        console.log(`   📈 Need ${profitNeeded.toFixed(2)}% price increase for profit target`);
+                        console.log(`   🎯 Sell trigger: ${targetPrice.toFixed(8)} WLD per ${strategy.targetTokenSymbol}`);
                     }
                 }
+                
+                console.log(`════════════════════════════════════════════════════════════`);
             }
             
         } catch (error) {
@@ -310,17 +375,30 @@ class StrategyBuilder extends EventEmitter {
         const priceDrop = ((highestPrice - currentPrice) / highestPrice) * 100;
         
         if (priceDrop >= strategy.dipThreshold) {
-            console.log(`📉 DIP DETECTED for ${strategy.name}!`);
-            console.log(`   📊 Price drop: ${priceDrop.toFixed(2)}% (Target: ${strategy.dipThreshold}%)`);
-            console.log(`   📈 High: ${highestPrice.toFixed(8)} WLD`);
-            console.log(`   📉 Current: ${currentPrice.toFixed(8)} WLD`);
+            console.log(`\n🚨 DIP DETECTED for ${strategy.name}!`);
+            console.log(`════════════════════════════════════════════════════════════`);
+            console.log(`   📊 DIP Analysis:`);
+            console.log(`      📈 Highest Price (${strategy.dipTimeframe/1000}s): ${highestPrice.toFixed(8)} WLD`);
+            console.log(`      📉 Current Price: ${currentPrice.toFixed(8)} WLD`);
+            console.log(`      📊 Price Drop: ${priceDrop.toFixed(2)}% (Target: ${strategy.dipThreshold}%)`);
+            console.log(`      🎯 DIP Trigger: ${(highestPrice * (1 - strategy.dipThreshold / 100)).toFixed(8)} WLD`);
             
             if (averagePrice) {
                 const avgComparison = ((currentPrice - averagePrice) / averagePrice) * 100;
-                console.log(`   📊 vs Average: ${avgComparison >= 0 ? '+' : ''}${avgComparison.toFixed(2)}% (${currentPrice <= averagePrice ? '✅ GOOD' : '❌ TOO HIGH'})`);
+                console.log(`   📊 Average Price Protection:`);
+                console.log(`      📊 Current Average: ${averagePrice.toFixed(8)} WLD`);
+                console.log(`      📈 Price vs Average: ${avgComparison >= 0 ? '+' : ''}${avgComparison.toFixed(2)}%`);
+                console.log(`      ${currentPrice <= averagePrice ? '✅ APPROVED: Price below average - will improve average' : '❌ BLOCKED: Price above average - maintaining discipline'}`);
+            } else {
+                console.log(`   🎯 Initial Position: No average price yet - first buy opportunity`);
             }
             
+            console.log(`   💰 Trade Details:`);
+            console.log(`      💵 Amount: ${strategy.tradeAmount} WLD → ${strategy.targetTokenSymbol}`);
+            console.log(`      📊 Max Slippage: ${strategy.maxSlippage}%`);
+            console.log(`════════════════════════════════════════════════════════════`);
             console.log(`   🚀 Executing DIP buy...`);
+            
             await this.executeDipBuy(strategy, currentPrice, averagePrice);
         }
     }
