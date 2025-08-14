@@ -940,17 +940,47 @@ class StrategyBuilder extends EventEmitter {
             console.log(`   📈 Current Value: ${(totalTokens * currentPrice).toFixed(6)} WLD`);
             console.log(`   💹 Unrealized P&L: ${unrealizedPnLPercent.toFixed(2)}%`);
             
-            // Check if we're in the profit range - AUTO-SELL IMMEDIATELY when profit range is reached
-            if (currentPrice >= minPrice) {
-                console.log(`🎯 PROFIT RANGE REACHED for ${strategy.name}! AUTO-SELLING ALL POSITIONS...`);
-                console.log(`   📊 Average Price: ${averagePrice.toFixed(8)} WLD`);
-                console.log(`   📊 Current Price: ${currentPrice.toFixed(8)} WLD`);
-                console.log(`   📊 Profit Target: ${strategy.profitRangeMin}% (${minPrice.toFixed(8)} WLD)`);
-                console.log(`   💹 Current Profit: ${unrealizedPnLPercent.toFixed(2)}%`);
-                console.log(`   🚀 EXECUTING IMMEDIATE AUTO-SELL!`);
+            // Check profit levels and execute appropriate auto-sell strategy
+            if (unrealizedPnLPercent >= strategy.profitRangeMin) {
                 
-                // Execute immediate complete sell when profit range is reached
-                await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'profit_target_reached');
+                // EXTREME PROFIT JUMP - Sell immediately if profit is 10x or more than target
+                if (unrealizedPnLPercent >= strategy.profitRangeMin * 10) {
+                    console.log(`🚨🚨 EXTREME PROFIT JUMP DETECTED! 🚨🚨`);
+                    console.log(`   📊 Target Profit: ${strategy.profitRangeMin}%`);
+                    console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (${(unrealizedPnLPercent / strategy.profitRangeMin).toFixed(1)}x target!)`);
+                    console.log(`   🚀 EMERGENCY PROFIT TAKING - SELLING ALL IMMEDIATELY!`);
+                    
+                    await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'extreme_profit_jump');
+                }
+                // VERY HIGH PROFIT - Sell immediately if profit is 5x or more than target  
+                else if (unrealizedPnLPercent >= strategy.profitRangeMin * 5) {
+                    console.log(`🚨 VERY HIGH PROFIT DETECTED! 🚨`);
+                    console.log(`   📊 Target Profit: ${strategy.profitRangeMin}%`);
+                    console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (${(unrealizedPnLPercent / strategy.profitRangeMin).toFixed(1)}x target!)`);
+                    console.log(`   🚀 HIGH PROFIT AUTO-SELL - SELLING ALL IMMEDIATELY!`);
+                    
+                    await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'high_profit_exceeded');
+                }
+                // MODERATE EXCESS PROFIT - Sell if profit is 3x or more than target
+                else if (unrealizedPnLPercent >= strategy.profitRangeMin * 3) {
+                    console.log(`⚡ PROFIT SIGNIFICANTLY EXCEEDED TARGET! ⚡`);
+                    console.log(`   📊 Target Profit: ${strategy.profitRangeMin}%`);
+                    console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (${(unrealizedPnLPercent / strategy.profitRangeMin).toFixed(1)}x target!)`);
+                    console.log(`   🚀 EXCESS PROFIT AUTO-SELL - SELLING ALL IMMEDIATELY!`);
+                    
+                    await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'excess_profit');
+                }
+                // NORMAL PROFIT TARGET REACHED - Standard auto-sell
+                else {
+                    console.log(`🎯 PROFIT TARGET REACHED for ${strategy.name}! AUTO-SELLING ALL POSITIONS...`);
+                    console.log(`   📊 Average Price: ${averagePrice.toFixed(8)} WLD`);
+                    console.log(`   📊 Current Price: ${currentPrice.toFixed(8)} WLD`);
+                    console.log(`   📊 Profit Target: ${strategy.profitRangeMin}% (${minPrice.toFixed(8)} WLD)`);
+                    console.log(`   💹 Current Profit: ${unrealizedPnLPercent.toFixed(2)}%`);
+                    console.log(`   🚀 EXECUTING STANDARD AUTO-SELL!`);
+                    
+                    await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'profit_target_reached');
+                }
             } else {
                 // Show how close we are to profit range
                 const progressToRange = ((currentPrice - averagePrice) / (minPrice - averagePrice)) * 100;
@@ -1087,10 +1117,34 @@ class StrategyBuilder extends EventEmitter {
     // Execute immediate profit sell when profit target is reached
     async executeImmediateProfitSell(strategy, openPositions, currentPrice, profitPercent, reason = 'profit_target_reached') {
         try {
-            console.log(`🚀 IMMEDIATE AUTO-SELL EXECUTING...`);
-            console.log(`   📊 Reason: ${reason}`);
+            // Get reason-specific messaging
+            const reasonMessages = {
+                'profit_target_reached': {
+                    title: '🎯 STANDARD AUTO-SELL',
+                    description: 'Profit target reached'
+                },
+                'excess_profit': {
+                    title: '⚡ EXCESS PROFIT AUTO-SELL',
+                    description: 'Profit significantly exceeded target (3x)'
+                },
+                'high_profit_exceeded': {
+                    title: '🚨 HIGH PROFIT AUTO-SELL',
+                    description: 'Very high profit detected (5x target)'
+                },
+                'extreme_profit_jump': {
+                    title: '🚨🚨 EMERGENCY PROFIT TAKING',
+                    description: 'Extreme profit jump detected (10x+ target)'
+                }
+            };
+            
+            const message = reasonMessages[reason] || reasonMessages['profit_target_reached'];
+            const profitMultiplier = (profitPercent / strategy.profitRangeMin).toFixed(1);
+            
+            console.log(`${message.title} EXECUTING...`);
+            console.log(`   📊 Reason: ${message.description}`);
             console.log(`   📊 Current Profit: ${profitPercent.toFixed(2)}%`);
             console.log(`   📊 Target Profit: ${strategy.profitRangeMin}%`);
+            console.log(`   📊 Profit Multiplier: ${profitMultiplier}x target`);
             
             const totalTokens = openPositions.reduce((sum, pos) => sum + pos.entryAmountToken, 0);
             const totalInvested = openPositions.reduce((sum, pos) => sum + pos.entryAmountWLD, 0);
