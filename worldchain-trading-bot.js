@@ -56,6 +56,9 @@ class WorldchainTradingBot {
             return Object.values(this.wallets).find(w => w.address.toLowerCase() === address.toLowerCase());
         };
         
+        // Auto-track discovered tokens
+        this.setupPriceDatabaseIntegration();
+        
         // Initialize trading strategy with both engines
         this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config, this.sinclaveEngine);
         this.setupStrategyEventListeners();
