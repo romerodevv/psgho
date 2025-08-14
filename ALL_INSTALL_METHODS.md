@@ -8,6 +8,8 @@ Choose the installation method that best fits your needs and experience level.
 
 | Method | Difficulty | Time | Best For |
 |--------|------------|------|----------|
+| **🐍 Python** | ⭐ Easy | 5 min | **All platforms (No Bash!)** |
+| **🌐 Web** | ⭐ Easy | 3 min | **Visual interface** |
 | **Ultra Quick** | ⭐ Easy | 2 min | Experienced users |
 | **Simple** | ⭐⭐ Easy | 5 min | Most users |
 | **Manual** | ⭐⭐⭐ Medium | 15 min | Control-focused users |
@@ -16,7 +18,69 @@ Choose the installation method that best fits your needs and experience level.
 
 ---
 
-## ⚡ **Method 1: Ultra Quick Install**
+## 🐍 **Method 1: Python Universal Installer (NEW!)**
+
+**Perfect for**: All platforms - Windows, macOS, Linux - **No bash required!**
+
+### **Download and Run:**
+```bash
+# Windows (PowerShell)
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/romerodevv/psgho/main/install.py" -OutFile "install.py"
+python install.py
+
+# macOS/Linux
+curl -O https://raw.githubusercontent.com/romerodevv/psgho/main/install.py
+python3 install.py
+```
+
+### **What it does:**
+- ✅ **Works on Windows, macOS, and Linux**
+- ✅ **No bash or shell scripting required**
+- ✅ Cross-platform Python installer
+- ✅ Automatic Node.js detection and installation
+- ✅ Interactive step-by-step process
+- ✅ Creates platform-specific helper scripts
+- ✅ Comprehensive error handling
+- ⏱️ **~5 minutes**
+
+### **Features:**
+- **Cross-platform compatibility**
+- **Beautiful colored terminal output**
+- **Automatic system detection**
+- **Smart Node.js installation**
+- **Interactive configuration**
+- **Windows batch files or shell scripts**
+- **Safe error handling with timeouts**
+
+---
+
+## 🌐 **Method 2: Web-Based Installer (NEW!)**
+
+**Perfect for**: Users who prefer a visual interface with platform-specific instructions
+
+### **Access the Web Installer:**
+**🔗 https://romerodevv.github.io/psgho/web-installer.html**
+
+### **What it includes:**
+- ✅ **Beautiful web interface**
+- ✅ **Auto-detects your operating system**
+- ✅ **Platform-specific instructions**
+- ✅ **One-click command copying**
+- ✅ **Visual method comparison**
+- ✅ **Step-by-step guides**
+- ⏱️ **~3 minutes**
+
+### **Features:**
+- **Windows**: Python installer + PowerShell one-liner
+- **macOS**: Python installer + Homebrew integration
+- **Linux**: Multiple options (Ultra Quick, Python, Docker, Manual)
+- **Interactive tabs** for each platform
+- **Copy-paste commands** with one click
+- **Visual progress indicators**
+
+---
+
+## ⚡ **Method 3: Ultra Quick Install**
 
 **Perfect for**: Experienced Linux users who want minimal output
 
@@ -41,7 +105,7 @@ nano .env          # Add your private key
 
 ---
 
-## 🛠️ **Method 2: Simple Install**
+## 🛠️ **Method 4: Simple Install**
 
 **Perfect for**: Most users who want to see progress
 
@@ -66,7 +130,7 @@ curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/simple-instal
 
 ---
 
-## 🔧 **Method 3: Manual Step-by-Step**
+## 🔧 **Method 5: Manual Step-by-Step**
 
 **Perfect for**: Users who want complete control over each step
 
@@ -97,7 +161,7 @@ curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/manual-instal
 
 ---
 
-## 🐳 **Method 4: Docker Installation**
+## 🐳 **Method 6: Docker Installation**
 
 **Perfect for**: Production deployments and containerized environments
 
