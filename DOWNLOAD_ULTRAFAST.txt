@@ -1,0 +1,114 @@
+🚀 COCOLISO PREMIUM ULTRA-FAST EDITION v2.1 - DOWNLOAD INSTRUCTIONS
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 MAJOR IMPROVEMENTS IN v2.1:
+✅ ULTRA-FAST EXECUTION: 11+ seconds → <3 seconds (70%+ faster!)
+✅ COLOR-CODED MONITORING: Green profits, Red losses
+✅ FLEXIBLE CONFIGURATION: Any percentage values (-99% to +999%)
+✅ STRATEGY BUILDER: Custom DIP/Profit strategies
+✅ PERFORMANCE FEEDBACK: Real-time execution metrics
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📥 QUICK DOWNLOAD & INSTALL (One Command):
+
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/cocoliso-premium-install.sh | bash
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📁 MANUAL DOWNLOAD OPTIONS:
+
+1. 🔗 GitHub Repository:
+   https://github.com/romerodevv/psgho
+
+2. 📦 Direct Clone:
+   git clone https://github.com/romerodevv/psgho.git cocoliso-ultrafast
+   cd cocoliso-ultrafast
+   npm install
+
+3. 💾 Download ZIP:
+   https://github.com/romerodevv/psgho/archive/refs/heads/main.zip
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚡ WHAT'S INCLUDED:
+
+🔧 Core Files:
+- worldchain-trading-bot.js (Main ultra-fast bot)
+- sinclave-enhanced-engine.js (Speed-optimized engine)
+- trading-strategy.js (Color-coded monitoring)
+- strategy-builder.js (Custom strategies)
+- token-discovery.js (Portfolio management)
+
+📚 Documentation:
+- COCOLISO_ULTRAFAST_INSTALL_GUIDE.md (Complete setup guide)
+- PERFORMANCE_OPTIMIZATIONS.md (Speed improvement details)
+- README.md (Full documentation)
+
+🛠️ Installation Scripts:
+- cocoliso-premium-install.sh (Auto installer)
+- install-holdstation-sdk.sh (SDK installer)
+
+⚙️ Configuration:
+- .env.example (Configuration template)
+- package.json (Dependencies)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 QUICK START AFTER DOWNLOAD:
+
+1. Configure your settings:
+   cp .env.example .env
+   nano .env  # Add your private keys and API keys
+
+2. Install dependencies:
+   npm install
+
+3. Install HoldStation SDK:
+   ./install-holdstation-sdk.sh
+
+4. Start trading:
+   node worldchain-trading-bot.js
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 PERFORMANCE HIGHLIGHTS:
+
+🚀 ULTRA-FAST EXECUTION: <3 seconds
+⚡ FAST EXECUTION: 3-6 seconds  
+⏳ STANDARD EXECUTION: 6+ seconds
+
+🎨 Color-Coded Monitoring:
+   🟢 Green = Profitable positions
+   🔴 Red = Losing positions
+
+⚙️ Flexible Configuration:
+   Stop Loss: -99% to +99%
+   Profit Target: 0.01% to 999%
+   DIP Threshold: 0.1% to 99%
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔗 SUPPORT & UPDATES:
+
+GitHub: https://github.com/romerodevv/psgho
+Issues: https://github.com/romerodevv/psgho/issues
+Documentation: Full guides included in download
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚠️ SYSTEM REQUIREMENTS:
+
+- Node.js 18+ 
+- npm (latest)
+- git (recommended)
+- Linux/macOS/Windows WSL
+- 2GB+ RAM
+- Stable internet connection
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎉 Ready for ULTRA-FAST trading with color-coded profit tracking!
+
+Download now and experience 70%+ faster execution times! 🚀
