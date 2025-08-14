@@ -1255,26 +1255,35 @@ class StrategyBuilder extends EventEmitter {
     getStrategyStatistics() {
         const strategies = this.getAllStrategies();
         const activeStrategies = strategies.filter(s => s.isActive);
-        const totalTrades = strategies.reduce((sum, s) => sum + s.totalTrades, 0);
-        const successfulTrades = strategies.reduce((sum, s) => sum + s.successfulTrades, 0);
-        const totalProfit = strategies.reduce((sum, s) => sum + s.totalProfit, 0);
+        const stoppedStrategies = strategies.filter(s => !s.isActive);
+        
+        // Safely calculate totals with fallback values
+        const totalTrades = strategies.reduce((sum, s) => sum + (s.totalTrades || 0), 0);
+        const successfulTrades = strategies.reduce((sum, s) => sum + (s.successfulTrades || 0), 0);
+        const failedTrades = strategies.reduce((sum, s) => sum + ((s.totalTrades || 0) - (s.successfulTrades || 0)), 0);
+        const totalProfit = strategies.reduce((sum, s) => sum + (s.totalProfit || 0), 0);
+        
+        // Calculate success rate safely
+        const successRate = totalTrades > 0 ? (successfulTrades / totalTrades * 100) : 0;
         
         return {
             totalStrategies: strategies.length,
             activeStrategies: activeStrategies.length,
+            stoppedStrategies: stoppedStrategies.length,
             totalTrades,
             successfulTrades,
-            successRate: totalTrades > 0 ? (successfulTrades / totalTrades * 100).toFixed(2) : '0.00',
+            failedTrades,
+            successRate: successRate.toFixed(2),
             totalProfit: totalProfit.toFixed(6),
             strategies: strategies.map(s => ({
                 id: s.id,
                 name: s.name,
-                tokenSymbol: s.tokenSymbol,
-                isActive: s.isActive,
-                totalTrades: s.totalTrades,
-                successfulTrades: s.successfulTrades,
-                totalProfit: s.totalProfit.toFixed(6),
-                openPositions: s.positions.filter(p => p.status === 'open').length
+                tokenSymbol: s.tokenSymbol || 'Unknown',
+                isActive: s.isActive || false,
+                totalTrades: s.totalTrades || 0,
+                successfulTrades: s.successfulTrades || 0,
+                totalProfit: (s.totalProfit || 0).toFixed(6),
+                openPositions: (s.positions || []).filter(p => p.status === 'open').length
             }))
         };
     }
