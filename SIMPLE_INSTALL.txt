@@ -1,0 +1,129 @@
+🚀 COCOLISO ULTRA-FAST TRADING BOT - SIMPLE INSTALLATION
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 CHOOSE YOUR INSTALLATION METHOD:
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📥 METHOD 1: SUPER SIMPLE (Recommended)
+
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/simple-install.sh | bash
+
+What it does:
+✅ Installs Node.js automatically
+✅ Downloads the trading bot
+✅ Installs all packages
+✅ Creates simple setup scripts
+✅ Works as root or regular user
+
+After installation:
+  cd ~/trading-bot (or /home/ubuntu/trading-bot if root)
+  ./setup.sh
+  ./start.sh
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📥 METHOD 2: ONE-LINE INSTALL (Ultra Simple)
+
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/one-line-install.sh | bash
+
+What it does:
+✅ Everything in one command
+✅ Zero questions asked
+✅ Installs to ~/trading-bot
+✅ Ready in 3-5 minutes
+
+After installation:
+  cd ~/trading-bot
+  ./setup.sh
+  node worldchain-trading-bot.js
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📥 METHOD 3: MANUAL (3 Commands)
+
+# Install Node.js
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs git
+
+# Download and setup
+git clone https://github.com/romerodevv/psgho.git trading-bot
+cd trading-bot && npm install
+
+# Configure and run
+cp .env.example .env
+nano .env  # Edit your private key
+node worldchain-trading-bot.js
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚡ FEATURES YOU GET:
+
+✅ <3 Second Trade Execution (70%+ faster)
+✅ Color-Coded Profits (Green) and Losses (Red)
+✅ Flexible Configuration (any percentage values)
+✅ Strategy Builder for custom trading
+✅ Real-time performance feedback
+✅ HoldStation SDK for ultra-fast execution
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 AFTER ANY INSTALLATION:
+
+1. Enter your private key when prompted
+2. Start the bot: node worldchain-trading-bot.js
+3. Choose "Enhanced Trade" (option 1) for fastest execution
+4. Watch profits in GREEN and losses in RED
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💡 SIMPLE USAGE TIPS:
+
+• Use small amounts first to test
+• Enhanced Trade = <3 second execution
+• Green numbers = making money 💚
+• Red numbers = losing money ❤️
+• Stop loss: any % from -99% to +99%
+• Profit target: 0.01% to 999%
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 SYSTEM REQUIREMENTS:
+
+✅ Linux (Ubuntu, Debian, CentOS, etc.)
+✅ 2GB+ RAM
+✅ Internet connection
+✅ Root or sudo access (for Node.js installation)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔒 SECURITY:
+
+✅ Private keys stored locally only
+✅ No data sent to external servers
+✅ Open source code on GitHub
+✅ Secure file permissions set automatically
+
+═══════════════════════════════════════════════════════════════════════════════
+
+❓ WHICH METHOD TO CHOOSE:
+
+🥇 New to Linux? → Use METHOD 1 (Super Simple)
+🥈 Want fastest install? → Use METHOD 2 (One-Line)
+🥉 Want full control? → Use METHOD 3 (Manual)
+
+All methods give you the same ultra-fast trading bot!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎉 READY TO TRADE!
+
+Pick any method above and you'll be trading with <3 second execution 
+times in just a few minutes!
+
+GitHub: https://github.com/romerodevv/psgho
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Last Updated: 2024 | Ultra-Fast Edition v2.1
