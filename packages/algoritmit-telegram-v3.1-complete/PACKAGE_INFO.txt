@@ -1,0 +1,43 @@
+ALGORITMIT v3.1 - Telegram Edition
+═══════════════════════════════════
+
+Package: algoritmit-telegram-v3.1-complete
+Version: 3.1.0
+Release Date: 2025-08-14
+Package Size: 632K
+
+KEY FEATURES:
+✅ Complete Telegram notifications system
+✅ Fixed Price Triggers menu (fully functional)
+✅ Robust error handling for HoldStation SDK
+✅ Multiple price source fallbacks
+✅ Health monitoring and automatic cleanup
+✅ CLI interface for headless operation
+✅ Enhanced ML trading with ALGORITMIT
+✅ Comprehensive documentation
+
+FIXES IN v3.1:
+🔧 Fixed "TypeError: this.createBuyTrigger is not a function"
+🔧 Fixed HoldStation SDK 404/400 errors with fallbacks
+🔧 Fixed price monitoring failures
+🔧 Fixed Telegram integration issues
+🔧 Enhanced error handling throughout
+
+INSTALLATION:
+1. Extract package to desired directory
+2. Run: chmod +x install-telegram-edition.sh
+3. Run: ./install-telegram-edition.sh
+4. Configure .env file with your credentials
+5. Start: ./start-algoritmit.sh
+
+REQUIREMENTS:
+- Node.js 18+ (installer will install if missing)
+- Git (installer will install if missing)
+- Linux/macOS/Windows WSL
+- Internet connection for dependencies
+
+SUPPORT:
+- Documentation: README.md
+- Telegram Guide: TELEGRAM_NOTIFICATIONS_GUIDE.md
+- CLI Guide: CLI_GUIDE.md
+- Issues: GitHub repository
