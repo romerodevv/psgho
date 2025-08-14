@@ -31,10 +31,30 @@ echo
 
 # Auto-detect installation directory
 if [[ $EUID -eq 0 ]]; then
-    # Running as root - install for ubuntu user by default
-    TARGET_USER="ubuntu"
+    # Running as root - find a suitable user
+    info "Running as root, selecting target user..."
+    
+    # Try to find a suitable non-root user
+    if id "ubuntu" &>/dev/null; then
+        TARGET_USER="ubuntu"
+    elif id "debian" &>/dev/null; then
+        TARGET_USER="debian"
+    elif id "centos" &>/dev/null; then
+        TARGET_USER="centos"
+    else
+        # Find first non-system user (UID >= 1000)
+        TARGET_USER=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 { print $1; exit }')
+        
+        if [ -z "$TARGET_USER" ]; then
+            # No suitable user found, create one
+            warn "No suitable user found, creating 'trader' user..."
+            useradd -m -s /bin/bash trader 2>/dev/null || true
+            TARGET_USER="trader"
+        fi
+    fi
+    
     INSTALL_DIR="/home/$TARGET_USER/trading-bot"
-    info "Installing as root for user: $TARGET_USER"
+    info "Installing for user: $TARGET_USER"
 else
     # Running as regular user
     TARGET_USER=$(whoami)
@@ -133,7 +153,16 @@ cd "$INSTALL_DIR"
 
 # Set ownership if root
 if [[ $EUID -eq 0 ]]; then
-    chown -R "$TARGET_USER:$TARGET_USER" "$INSTALL_DIR"
+    if id "$TARGET_USER" &>/dev/null; then
+        chown -R "$TARGET_USER:$TARGET_USER" "$INSTALL_DIR" 2>/dev/null || {
+            chown -R "$TARGET_USER" "$INSTALL_DIR" 2>/dev/null || true
+        }
+        chmod 600 "$INSTALL_DIR/.env" 2>/dev/null || true
+        ok "File ownership set to $TARGET_USER"
+    else
+        warn "User $TARGET_USER not found, files owned by root"
+        info "To fix ownership later: sudo chown -R username:username $INSTALL_DIR"
+    fi
 fi
 
 ok "Directory ready: $INSTALL_DIR"
