@@ -77,11 +77,33 @@ echo
 print_header "🚀 STARTING NOVICE-FRIENDLY INSTALLATION..."
 echo
 
-# Check if running as root
+# Check if running as root and handle appropriately
 if [[ $EUID -eq 0 ]]; then
-   print_error "For security reasons, please don't run this as root"
-   print_info "Run this command instead: bash novice-ultrafast-installer.sh"
-   exit 1
+   print_warning "Running as root detected"
+   print_info "For security, the bot will be installed for a regular user"
+   
+   # Ask which user to install for
+   echo
+   read -p "Enter the username to install for (or press Enter for 'ubuntu'): " TARGET_USER
+   if [ -z "$TARGET_USER" ]; then
+       TARGET_USER="ubuntu"
+   fi
+   
+   # Check if user exists
+   if ! id "$TARGET_USER" &>/dev/null; then
+       print_error "User '$TARGET_USER' does not exist"
+       print_info "Available users:"
+       cut -d: -f1 /etc/passwd | grep -v "^root$" | grep -v "^daemon$" | grep -v "^bin$" | grep -v "^sys$" | head -10
+       exit 1
+   fi
+   
+   print_success "Will install for user: $TARGET_USER"
+   INSTALL_AS_ROOT=true
+   INSTALL_DIR="/home/$TARGET_USER/cocoliso-ultrafast-novice"
+else
+   print_success "Running as regular user - good security practice"
+   INSTALL_AS_ROOT=false
+   INSTALL_DIR="$HOME/cocoliso-ultrafast-novice"
 fi
 
 # Function to check if a command exists
@@ -165,7 +187,6 @@ else
 fi
 
 # Create installation directory
-INSTALL_DIR="$HOME/cocoliso-ultrafast-novice"
 print_step "[4/10] Setting up installation directory..."
 
 if [ -d "$INSTALL_DIR" ]; then
@@ -180,9 +201,17 @@ if [ -d "$INSTALL_DIR" ]; then
     fi
 fi
 
-mkdir -p "$INSTALL_DIR"
+if [ "$INSTALL_AS_ROOT" = true ]; then
+    # Create directory as root but set proper ownership
+    mkdir -p "$INSTALL_DIR"
+    chown -R "$TARGET_USER:$TARGET_USER" "$INSTALL_DIR"
+    print_success "Created directory: $INSTALL_DIR (owned by $TARGET_USER)"
+else
+    mkdir -p "$INSTALL_DIR"
+    print_success "Created directory: $INSTALL_DIR"
+fi
+
 cd "$INSTALL_DIR"
-print_success "Created installation directory: $INSTALL_DIR"
 
 # Download the bot
 print_step "[5/10] Downloading Ultra-Fast Trading Bot..."
@@ -214,7 +243,13 @@ print_step "[6/10] Installing Node.js dependencies..."
 print_info "   This may take 3-5 minutes, please be patient..."
 show_progress 5 "   Installing core packages"
 
-npm install --silent >/dev/null 2>&1
+if [ "$INSTALL_AS_ROOT" = true ]; then
+    # Run npm as the target user
+    sudo -u "$TARGET_USER" npm install --silent >/dev/null 2>&1
+else
+    npm install --silent >/dev/null 2>&1
+fi
+
 if [ $? -eq 0 ]; then
     print_success "Core dependencies installed successfully"
 else
@@ -226,13 +261,23 @@ print_step "[7/10] Installing HoldStation SDK for ultra-fast trading..."
 print_info "   Installing WorldChain SDK components..."
 show_progress 3 "   Installing @holdstation/worldchain-sdk"
 
-npm install @holdstation/worldchain-sdk@latest --silent >/dev/null 2>&1
-
-show_progress 2 "   Installing @holdstation/worldchain-ethers-v6"
-npm install @holdstation/worldchain-ethers-v6@latest --silent >/dev/null 2>&1
-
-show_progress 2 "   Installing @worldcoin/minikit-js"
-npm install @worldcoin/minikit-js@latest --silent >/dev/null 2>&1
+if [ "$INSTALL_AS_ROOT" = true ]; then
+    sudo -u "$TARGET_USER" npm install @holdstation/worldchain-sdk@latest --silent >/dev/null 2>&1
+    
+    show_progress 2 "   Installing @holdstation/worldchain-ethers-v6"
+    sudo -u "$TARGET_USER" npm install @holdstation/worldchain-ethers-v6@latest --silent >/dev/null 2>&1
+    
+    show_progress 2 "   Installing @worldcoin/minikit-js"
+    sudo -u "$TARGET_USER" npm install @worldcoin/minikit-js@latest --silent >/dev/null 2>&1
+else
+    npm install @holdstation/worldchain-sdk@latest --silent >/dev/null 2>&1
+    
+    show_progress 2 "   Installing @holdstation/worldchain-ethers-v6"
+    npm install @holdstation/worldchain-ethers-v6@latest --silent >/dev/null 2>&1
+    
+    show_progress 2 "   Installing @worldcoin/minikit-js"
+    npm install @worldcoin/minikit-js@latest --silent >/dev/null 2>&1
+fi
 
 print_success "HoldStation SDK installed - Ultra-fast trading enabled!"
 
@@ -323,6 +368,16 @@ EOF
 chmod +x setup-config.sh
 
 print_success "Novice-friendly helper scripts created"
+
+# Set proper ownership and permissions if installed as root
+if [ "$INSTALL_AS_ROOT" = true ]; then
+    print_info "Setting proper file ownership and permissions..."
+    chown -R "$TARGET_USER:$TARGET_USER" "$INSTALL_DIR"
+    chmod 600 "$INSTALL_DIR/.env"  # Secure the config file
+    chmod +x "$INSTALL_DIR"/*.sh   # Make scripts executable
+    print_success "File ownership set to $TARGET_USER"
+fi
+
 sleep 1
 
 # Installation complete
@@ -347,18 +402,30 @@ echo
 print_header "🚀 NEXT STEPS FOR NOVICE TRADERS:"
 echo
 print_info "STEP 1: Configure your wallet (REQUIRED)"
-print_warning "   cd $INSTALL_DIR"
-print_warning "   ./setup-config.sh"
-print_info "   (This will ask for your private key securely)"
-echo
-
-print_info "STEP 2: Start trading!"
-print_warning "   ./start-bot.sh"
-echo
-
-print_info "ALTERNATIVE: Manual configuration"
-print_warning "   nano .env  # Edit configuration file manually"
-print_warning "   node worldchain-trading-bot.js  # Start bot"
+if [ "$INSTALL_AS_ROOT" = true ]; then
+    print_warning "   sudo -u $TARGET_USER bash -c 'cd $INSTALL_DIR && ./setup-config.sh'"
+    print_info "   (This will ask for your private key securely)"
+    echo
+    print_info "STEP 2: Start trading!"
+    print_warning "   sudo -u $TARGET_USER bash -c 'cd $INSTALL_DIR && ./start-bot.sh'"
+    echo
+    print_info "ALTERNATIVE: Switch to user and run manually"
+    print_warning "   su - $TARGET_USER"
+    print_warning "   cd $INSTALL_DIR"
+    print_warning "   ./setup-config.sh"
+    print_warning "   ./start-bot.sh"
+else
+    print_warning "   cd $INSTALL_DIR"
+    print_warning "   ./setup-config.sh"
+    print_info "   (This will ask for your private key securely)"
+    echo
+    print_info "STEP 2: Start trading!"
+    print_warning "   ./start-bot.sh"
+    echo
+    print_info "ALTERNATIVE: Manual configuration"
+    print_warning "   nano .env  # Edit configuration file manually"
+    print_warning "   node worldchain-trading-bot.js  # Start bot"
+fi
 echo
 
 print_header "💡 NOVICE TIPS:"
@@ -384,7 +451,11 @@ echo
 
 print_header "🎉 READY TO TRADE AT ULTRA-FAST SPEEDS!"
 print_success "Your trading bot is installed and ready to deliver <3 second execution times!"
-print_info "💡 Run './setup-config.sh' to configure your wallet and start trading!"
+if [ "$INSTALL_AS_ROOT" = true ]; then
+    print_info "💡 Run 'sudo -u $TARGET_USER bash -c \"cd $INSTALL_DIR && ./setup-config.sh\"' to configure!"
+else
+    print_info "💡 Run './setup-config.sh' to configure your wallet and start trading!"
+fi
 
 echo
 print_header "Installation Summary:"
