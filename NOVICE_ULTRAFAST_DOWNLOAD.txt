@@ -1,0 +1,132 @@
+🚀 COCOLISO ULTRA-FAST EDITION - NOVICE SELF-INSTALLER
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 DESIGNED FOR COMPLETE BEGINNERS!
+
+✅ Installs Node.js automatically (if needed)
+✅ Downloads the Ultra-Fast Trading Bot
+✅ Installs all dependencies automatically
+✅ Sets up HoldStation SDK for <3 second trades
+✅ Creates helper scripts for easy configuration
+✅ Tests everything to ensure it works
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📥 ONE-COMMAND INSTALLATION (EASIEST):
+
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/novice-ultrafast-installer.sh | bash
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📁 MANUAL DOWNLOAD & INSTALL:
+
+1. Download the installer:
+   wget https://raw.githubusercontent.com/romerodevv/psgho/main/novice-ultrafast-installer.sh
+
+2. Make it executable:
+   chmod +x novice-ultrafast-installer.sh
+
+3. Run the installer:
+   ./novice-ultrafast-installer.sh
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⏱️ INSTALLATION TIME: 5-10 minutes (fully automated)
+
+🎯 WHAT HAPPENS AUTOMATICALLY:
+- Detects your operating system
+- Installs Node.js 18+ if needed
+- Downloads the latest Ultra-Fast Trading Bot
+- Installs all required packages
+- Sets up HoldStation SDK for fastest trading
+- Creates configuration files
+- Creates helper scripts for beginners
+- Tests everything to make sure it works
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 AFTER INSTALLATION:
+
+1. Configure your wallet:
+   cd ~/cocoliso-ultrafast-novice
+   ./setup-config.sh
+
+2. Start trading:
+   ./start-bot.sh
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 ULTRA-FAST FEATURES:
+
+⚡ <3 Second Execution Time (70%+ faster than before)
+🎨 Color-Coded Monitoring (Green profits, Red losses)
+⚙️ Flexible Configuration (Any percentage values)
+🏗️ Strategy Builder (Custom DIP/Profit strategies)
+📊 Real-Time Performance Feedback
+🤖 Beginner-Friendly Interface
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💡 NOVICE-FRIENDLY FEATURES:
+
+🔧 setup-config.sh - Easy configuration helper
+🚀 start-bot.sh - Simple bot starter
+📚 Complete documentation included
+🎯 Step-by-step guidance throughout
+🔒 Secure private key handling
+💡 Helpful tips and warnings
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 SYSTEM REQUIREMENTS:
+
+✅ Linux or macOS (Windows WSL also works)
+✅ Internet connection
+✅ 2GB+ RAM available
+✅ Administrator access (for Node.js installation if needed)
+
+NOTE: Node.js will be installed automatically if not present!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔒 SECURITY FEATURES:
+
+✅ Secure private key storage in .env file
+✅ No root access required for bot operation
+✅ All dependencies verified and installed safely
+✅ Configuration helper protects your keys
+✅ No hardcoded credentials anywhere
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🛠️ WHAT GETS INSTALLED:
+
+📦 Node.js 18+ (if not already installed)
+🤖 Cocoliso Ultra-Fast Trading Bot
+⚡ HoldStation SDK for ultra-fast execution
+🔧 All required Node.js packages
+📋 Configuration templates
+🚀 Novice-friendly helper scripts
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📞 SUPPORT:
+
+🔗 GitHub: https://github.com/romerodevv/psgho
+📚 Documentation: Included with installation
+💡 Helper Scripts: Created automatically
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎉 READY FOR NOVICE TRADERS!
+
+This installer makes it SUPER EASY for beginners to get started with 
+ultra-fast WorldChain trading. Everything is automated and explained 
+step-by-step!
+
+Download now and start trading with <3 second execution times! 🚀
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Last Updated: 2024 | Version: 2.1 Ultra-Fast Novice Edition
