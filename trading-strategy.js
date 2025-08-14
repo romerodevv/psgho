@@ -2,11 +2,12 @@ const { ethers } = require('ethers');
 const EventEmitter = require('events');
 
 class TradingStrategy extends EventEmitter {
-    constructor(tradingEngine, config, sinclaveEngine = null) {
+    constructor(tradingEngine, config, sinclaveEngine = null, telegramNotifications = null) {
         super();
         this.tradingEngine = tradingEngine;
         this.sinclaveEngine = sinclaveEngine; // Enhanced engine for better execution
         this.config = config;
+        this.telegramNotifications = telegramNotifications;
         
         // Strategy configuration with defaults
         this.strategyConfig = {
@@ -267,6 +268,19 @@ class TradingStrategy extends EventEmitter {
             console.log(`🛑 Stop Loss: ${position.stopLossWLD.toFixed(6)} WLD (${this.strategyConfig.stopLossThreshold}% loss)`);
             console.log(`📊 Monitoring will check reverse swap quotes every ${this.strategyConfig.priceCheckInterval/1000}s`);
             
+            // Send Telegram notification if configured
+            if (this.telegramNotifications) {
+                await this.telegramNotifications.notifyTradeExecution({
+                    type: 'buy',
+                    tokenSymbol: tokenAddress.slice(0, 8) + '...',
+                    amount: actualWLDSpent,
+                    outputAmount: actualTokensReceived.toFixed(6),
+                    price: executedRate.toFixed(8),
+                    gasUsed: result.gasUsed || 'N/A',
+                    executionTime: result.executionTime || 'N/A'
+                });
+            }
+            
             this.emit('positionOpened', position);
             return position;
             
@@ -413,6 +427,22 @@ class TradingStrategy extends EventEmitter {
             const resetColor = '\x1b[0m'; // Reset color
             console.log(`${pnlColor}💰 P&L: ${realizedPnL.toFixed(4)} WLD (${realizedPnLPercent.toFixed(2)}%)${resetColor}`);
             
+            // Send Telegram notification if configured
+            if (this.telegramNotifications) {
+                await this.telegramNotifications.notifyTradeExecution({
+                    type: 'sell',
+                    tokenSymbol: tokenAddress.slice(0, 8) + '...',
+                    amount: position.entryAmountToken.toFixed(6),
+                    outputAmount: exitAmountWLD.toFixed(6),
+                    price: currentPrice.toFixed(8),
+                    gasUsed: result.gasUsed || 'N/A',
+                    executionTime: result.executionTime || 'N/A',
+                    profit: realizedPnL.toFixed(4),
+                    profitPercent: realizedPnLPercent.toFixed(2),
+                    reason: reason
+                });
+            }
+            
             this.emit('positionClosed', position);
             return position;
             
@@ -537,6 +567,33 @@ class TradingStrategy extends EventEmitter {
             // Keep only last 100 history entries
             if (history.length > 100) {
                 history.shift();
+            }
+            
+            // Send Telegram alerts for significant profit/loss changes
+            if (this.telegramNotifications) {
+                if (unrealizedPnLPercent >= 10) { // 10%+ profit
+                    await this.telegramNotifications.notifyProfitAlert(position, unrealizedPnLPercent);
+                } else if (unrealizedPnLPercent <= -5) { // 5%+ loss
+                    await this.telegramNotifications.notifyLossAlert(position, unrealizedPnLPercent);
+                }
+                
+                // Send position updates for significant changes (every 5% change)
+                const lastAlert = this.lastProfitAlert?.get(tokenAddress) || 0;
+                if (Math.abs(unrealizedPnLPercent - lastAlert) >= 5) {
+                    await this.telegramNotifications.notifyPositionUpdate({
+                        tokenSymbol: tokenAddress.slice(0, 8) + '...',
+                        entryPrice: position.entryAmountWLD / position.entryAmountToken,
+                        currentPrice: currentWLDValue / position.entryAmountToken,
+                        amount: position.entryAmountToken,
+                        currentValue: currentWLDValue,
+                        unrealizedPnL: unrealizedPnL,
+                        strategy: 'Main Strategy'
+                    });
+                    
+                    // Track last alert level
+                    if (!this.lastProfitAlert) this.lastProfitAlert = new Map();
+                    this.lastProfitAlert.set(tokenAddress, unrealizedPnLPercent);
+                }
             }
             
             // Check for profit target (using actual swap quotes)

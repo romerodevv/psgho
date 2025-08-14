@@ -14,6 +14,7 @@ const TradingStrategy = require('./trading-strategy');
 const StrategyBuilder = require('./strategy-builder');
 const PriceDatabase = require('./price-database');
 const AlgoritmitStrategy = require('./algoritmit-strategy');
+const TelegramNotifications = require('./telegram-notifications');
 require('dotenv').config();
 
 class WorldchainTradingBot {
@@ -64,6 +65,9 @@ class WorldchainTradingBot {
             this.priceDatabase, 
             this.config
         );
+
+        // Initialize Telegram notifications
+        this.telegramNotifications = new TelegramNotifications(this.config);
         
         // Auto-track discovered tokens
         this.setupPriceDatabaseIntegration();
@@ -71,8 +75,8 @@ class WorldchainTradingBot {
         // Start background price monitoring
         this.startPriceMonitoring();
         
-        // Initialize trading strategy with both engines
-        this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config, this.sinclaveEngine);
+        // Initialize trading strategy with both engines and Telegram notifications
+        this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config, this.sinclaveEngine, this.telegramNotifications);
         this.setupStrategyEventListeners();
         
         // WLD token address on Worldchain (correct address)
@@ -186,9 +190,10 @@ class WorldchainTradingBot {
         console.log(chalk.cyan('5. 🏗️  Strategy Builder (Custom DIP/Profit)'));
         console.log(chalk.cyan('6. 🎯 Price Triggers (Buy/Sell Automation)'));
         console.log(chalk.cyan('7. 🤖 ALGORITMIT (Machine Learning Trading)'));
-        console.log(chalk.cyan('8. ⚙️  Configuration'));
-        console.log(chalk.cyan('9. 📊 Portfolio Overview'));
-        console.log(chalk.red('10. 🚪 Exit'));
+        console.log(chalk.cyan('8. 📱 Telegram Notifications'));
+        console.log(chalk.cyan('9. ⚙️  Configuration'));
+        console.log(chalk.cyan('10. 📊 Portfolio Overview'));
+        console.log(chalk.red('11. 🚪 Exit'));
         console.log(chalk.gray('─'.repeat(30)));
     }
 
@@ -2211,12 +2216,15 @@ class WorldchainTradingBot {
                     await this.algoritmitMenu();
                     break;
                 case '8':
-                    await this.configurationMenu();
+                    await this.telegramNotificationsMenu();
                     break;
                 case '9':
-                    await this.portfolioSummary();
+                    await this.configurationMenu();
                     break;
                 case '10':
+                    await this.portfolioSummary();
+                    break;
+                case '11':
                     console.log(chalk.green('\n👋 Thank you for using WorldChain Trading Bot!'));
                     console.log(chalk.yellow('💡 Remember to keep your private keys secure!'));
                     
@@ -4482,6 +4490,313 @@ class WorldchainTradingBot {
                 this.strategyBuilder.stopStrategy(strategy.id);
             });
         }
+    }
+
+    // Telegram Notifications Menu
+    async telegramNotificationsMenu() {
+        while (true) {
+            console.clear();
+            console.log(chalk.cyan('📱 TELEGRAM NOTIFICATIONS'));
+            console.log(chalk.gray('═'.repeat(50)));
+            
+            const settings = this.telegramNotifications.getSettings();
+            
+            console.log(chalk.white('\n🔧 Current Status:'));
+            console.log(chalk.white(`   Configured: ${settings.configured ? '✅ Yes' : '❌ No'}`));
+            console.log(chalk.white(`   Enabled: ${settings.enabled ? '🟢 Active' : '🔴 Disabled'}`));
+            
+            if (settings.configured) {
+                console.log(chalk.white(`   Bot Token: ${process.env.TELEGRAM_BOT_TOKEN ? '✅ Set' : '❌ Missing'}`));
+                console.log(chalk.white(`   Chat ID: ${process.env.TELEGRAM_CHAT_ID ? '✅ Set' : '❌ Missing'}`));
+            }
+            
+            console.log(chalk.cyan('\n📋 Menu Options:'));
+            console.log(chalk.cyan('1. 🔧 Setup Telegram Bot'));
+            console.log(chalk.cyan('2. 📊 Test Notifications'));
+            console.log(chalk.cyan('3. ⚙️  Notification Settings'));
+            console.log(chalk.cyan('4. 🟢 Enable Notifications'));
+            console.log(chalk.cyan('5. 🔴 Disable Notifications'));
+            console.log(chalk.cyan('6. 📈 Send Position Status'));
+            console.log(chalk.cyan('7. 📊 Send Daily Report'));
+            console.log(chalk.cyan('8. 💬 Send Custom Message'));
+            console.log(chalk.red('9. 🔙 Back to Main Menu'));
+            
+            const choice = await this.getUserInput('\nSelect option: ');
+            
+            switch (choice) {
+                case '1':
+                    await this.setupTelegramBot();
+                    break;
+                case '2':
+                    await this.testTelegramNotifications();
+                    break;
+                case '3':
+                    await this.configureTelegramSettings();
+                    break;
+                case '4':
+                    await this.enableTelegramNotifications();
+                    break;
+                case '5':
+                    await this.disableTelegramNotifications();
+                    break;
+                case '6':
+                    await this.sendPositionStatus();
+                    break;
+                case '7':
+                    await this.sendDailyReport();
+                    break;
+                case '8':
+                    await this.sendCustomTelegramMessage();
+                    break;
+                case '9':
+                    return;
+                default:
+                    console.log(chalk.red('❌ Invalid option'));
+                    await this.sleep(1500);
+            }
+        }
+    }
+
+    async setupTelegramBot() {
+        console.clear();
+        console.log(chalk.cyan('🔧 TELEGRAM BOT SETUP'));
+        console.log(chalk.gray('═'.repeat(40)));
+        
+        console.log(chalk.white('\n📝 To set up Telegram notifications, you need:'));
+        console.log(chalk.white('1. Create a Telegram bot'));
+        console.log(chalk.white('2. Get your chat ID'));
+        console.log(chalk.white('3. Add credentials to .env file'));
+        
+        console.log(chalk.yellow('\n🤖 Step 1: Create a Telegram Bot'));
+        console.log(chalk.white('1. Open Telegram and search for @BotFather'));
+        console.log(chalk.white('2. Send /newbot command'));
+        console.log(chalk.white('3. Choose a name for your bot (e.g., "My ALGORITMIT Bot")'));
+        console.log(chalk.white('4. Choose a username (must end with "bot", e.g., "myalgoritmit_bot")'));
+        console.log(chalk.white('5. Copy the bot token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)'));
+        
+        console.log(chalk.yellow('\n💬 Step 2: Get Your Chat ID'));
+        console.log(chalk.white('1. Start a chat with your new bot'));
+        console.log(chalk.white('2. Send any message to the bot'));
+        console.log(chalk.white('3. Visit: https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates'));
+        console.log(chalk.white('4. Look for "chat":{"id": YOUR_CHAT_ID'));
+        console.log(chalk.white('5. Copy the chat ID (a number like: 123456789)'));
+        
+        console.log(chalk.yellow('\n⚙️  Step 3: Add to .env File'));
+        console.log(chalk.white('Add these lines to your .env file:'));
+        console.log(chalk.gray('TELEGRAM_BOT_TOKEN=your_bot_token_here'));
+        console.log(chalk.gray('TELEGRAM_CHAT_ID=your_chat_id_here'));
+        
+        const hasToken = await this.getUserInput('\n✅ Have you added the bot token to .env? (y/n): ');
+        if (hasToken.toLowerCase() === 'y') {
+            const hasChat = await this.getUserInput('✅ Have you added the chat ID to .env? (y/n): ');
+            if (hasChat.toLowerCase() === 'y') {
+                console.log(chalk.yellow('\n🔄 Please restart ALGORITMIT to load the new configuration.'));
+                await this.getUserInput('Press Enter to continue...');
+            }
+        }
+    }
+
+    async testTelegramNotifications() {
+        console.clear();
+        console.log(chalk.cyan('📊 TESTING TELEGRAM NOTIFICATIONS'));
+        console.log(chalk.gray('═'.repeat(45)));
+        
+        const settings = this.telegramNotifications.getSettings();
+        
+        if (!settings.configured) {
+            console.log(chalk.red('❌ Telegram not configured. Please set up bot token and chat ID first.'));
+            await this.getUserInput('Press Enter to continue...');
+            return;
+        }
+        
+        console.log(chalk.yellow('📤 Sending test message...'));
+        
+        const result = await this.telegramNotifications.sendCustomMessage(
+            '🧪 <b>ALGORITMIT Test Notification</b>\n\n' +
+            '✅ Telegram notifications are working!\n' +
+            '📊 Position updates enabled\n' +
+            '💹 Trade alerts enabled\n' +
+            '🎯 Strategy notifications enabled\n\n' +
+            `🕐 Test sent at: ${new Date().toLocaleString()}`
+        );
+        
+        if (result.success) {
+            console.log(chalk.green('✅ Test message sent successfully!'));
+            console.log(chalk.white('Check your Telegram chat for the test message.'));
+        } else {
+            console.log(chalk.red('❌ Failed to send test message:'));
+            console.log(chalk.red(`   Error: ${result.error}`));
+            console.log(chalk.yellow('\n💡 Please check:'));
+            console.log(chalk.white('   - Bot token is correct'));
+            console.log(chalk.white('   - Chat ID is correct'));
+            console.log(chalk.white('   - You have sent at least one message to the bot'));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    async configureTelegramSettings() {
+        console.clear();
+        console.log(chalk.cyan('⚙️  TELEGRAM NOTIFICATION SETTINGS'));
+        console.log(chalk.gray('═'.repeat(45)));
+        
+        const settings = this.telegramNotifications.getSettings();
+        
+        console.log(chalk.white('\n📊 Current Settings:'));
+        console.log(chalk.white(`   Position Updates: ${settings.settings.positionUpdates ? '✅' : '❌'}`));
+        console.log(chalk.white(`   Trade Executions: ${settings.settings.tradeExecutions ? '✅' : '❌'}`));
+        console.log(chalk.white(`   Profit Alerts: ${settings.settings.profitAlerts ? '✅' : '❌'}`));
+        console.log(chalk.white(`   Loss Alerts: ${settings.settings.lossAlerts ? '✅' : '❌'}`));
+        console.log(chalk.white(`   Strategy Updates: ${settings.settings.strategyUpdates ? '✅' : '❌'}`));
+        console.log(chalk.white(`   Price Alerts: ${settings.settings.priceAlerts ? '✅' : '❌'}`));
+        console.log(chalk.white(`   Minimum Interval: ${settings.settings.minimumInterval / 1000 / 60} minutes`));
+        console.log(chalk.white(`   Profit Threshold: ${settings.settings.profitThreshold}%`));
+        console.log(chalk.white(`   Loss Threshold: ${settings.settings.lossThreshold}%`));
+        
+        console.log(chalk.cyan('\n🔧 Configure:'));
+        console.log(chalk.cyan('1. Toggle Position Updates'));
+        console.log(chalk.cyan('2. Toggle Trade Executions'));
+        console.log(chalk.cyan('3. Toggle Profit Alerts'));
+        console.log(chalk.cyan('4. Toggle Loss Alerts'));
+        console.log(chalk.cyan('5. Toggle Strategy Updates'));
+        console.log(chalk.cyan('6. Toggle Price Alerts'));
+        console.log(chalk.cyan('7. Set Notification Interval'));
+        console.log(chalk.cyan('8. Set Profit Threshold'));
+        console.log(chalk.cyan('9. Set Loss Threshold'));
+        console.log(chalk.red('10. Back'));
+        
+        const choice = await this.getUserInput('\nSelect option: ');
+        
+        const currentSettings = settings.settings;
+        
+        switch (choice) {
+            case '1':
+                currentSettings.positionUpdates = !currentSettings.positionUpdates;
+                break;
+            case '2':
+                currentSettings.tradeExecutions = !currentSettings.tradeExecutions;
+                break;
+            case '3':
+                currentSettings.profitAlerts = !currentSettings.profitAlerts;
+                break;
+            case '4':
+                currentSettings.lossAlerts = !currentSettings.lossAlerts;
+                break;
+            case '5':
+                currentSettings.strategyUpdates = !currentSettings.strategyUpdates;
+                break;
+            case '6':
+                currentSettings.priceAlerts = !currentSettings.priceAlerts;
+                break;
+            case '7':
+                const intervalMinutes = await this.getUserInput('Enter notification interval in minutes (default 5): ');
+                const minutes = parseInt(intervalMinutes) || 5;
+                currentSettings.minimumInterval = minutes * 60 * 1000;
+                break;
+            case '8':
+                const profitThreshold = await this.getUserInput('Enter profit threshold % (default 5): ');
+                currentSettings.profitThreshold = parseFloat(profitThreshold) || 5;
+                break;
+            case '9':
+                const lossThreshold = await this.getUserInput('Enter loss threshold % (default -10): ');
+                currentSettings.lossThreshold = parseFloat(lossThreshold) || -10;
+                break;
+            case '10':
+                return;
+        }
+        
+        if (choice !== '10') {
+            this.telegramNotifications.updateSettings(currentSettings);
+            console.log(chalk.green('✅ Settings updated!'));
+            await this.sleep(1500);
+        }
+    }
+
+    async enableTelegramNotifications() {
+        try {
+            await this.telegramNotifications.enable();
+            console.log(chalk.green('✅ Telegram notifications enabled!'));
+        } catch (error) {
+            console.log(chalk.red(`❌ Failed to enable notifications: ${error.message}`));
+        }
+        await this.getUserInput('Press Enter to continue...');
+    }
+
+    async disableTelegramNotifications() {
+        this.telegramNotifications.disable();
+        console.log(chalk.yellow('🔴 Telegram notifications disabled'));
+        await this.getUserInput('Press Enter to continue...');
+    }
+
+    async sendPositionStatus() {
+        console.log(chalk.yellow('📤 Sending position status...'));
+        
+        const positions = this.tradingStrategy.getAllPositions();
+        
+        if (positions.length === 0) {
+            const result = await this.telegramNotifications.sendCustomMessage(
+                '📊 <b>POSITION STATUS</b>\n\n' +
+                '📭 No open positions\n\n' +
+                `🕐 ${new Date().toLocaleString()}`
+            );
+            
+            if (result.success) {
+                console.log(chalk.green('✅ Position status sent!'));
+            } else {
+                console.log(chalk.red('❌ Failed to send position status'));
+            }
+        } else {
+            for (const position of positions) {
+                await this.telegramNotifications.notifyPositionUpdate(position);
+            }
+            console.log(chalk.green(`✅ Sent status for ${positions.length} positions!`));
+        }
+        
+        await this.getUserInput('Press Enter to continue...');
+    }
+
+    async sendDailyReport() {
+        console.log(chalk.yellow('📤 Sending daily report...'));
+        
+        const strategyStats = this.tradingStrategy.getStatistics();
+        const customStats = this.strategyBuilder.getStrategyStatistics();
+        
+        const combinedStats = {
+            totalTrades: strategyStats.totalTrades + customStats.totalTrades,
+            successfulTrades: strategyStats.successfulTrades + customStats.successfulTrades,
+            failedTrades: (strategyStats.totalTrades - strategyStats.successfulTrades) + customStats.failedTrades,
+            successRate: strategyStats.successRate,
+            totalPnL: strategyStats.totalPnL + customStats.totalProfit,
+            openPositions: strategyStats.openPositions,
+            activeStrategies: customStats.activeStrategies
+        };
+        
+        await this.telegramNotifications.notifyDailyReport(combinedStats);
+        console.log(chalk.green('✅ Daily report sent!'));
+        await this.getUserInput('Press Enter to continue...');
+    }
+
+    async sendCustomTelegramMessage() {
+        console.log(chalk.cyan('💬 SEND CUSTOM MESSAGE'));
+        console.log(chalk.gray('═'.repeat(30)));
+        
+        const message = await this.getUserInput('Enter your message: ');
+        
+        if (message.trim()) {
+            console.log(chalk.yellow('📤 Sending message...'));
+            
+            const result = await this.telegramNotifications.sendCustomMessage(
+                `💬 <b>Custom Message</b>\n\n${message}\n\n🕐 ${new Date().toLocaleString()}`
+            );
+            
+            if (result.success) {
+                console.log(chalk.green('✅ Message sent successfully!'));
+            } else {
+                console.log(chalk.red(`❌ Failed to send message: ${result.error}`));
+            }
+        }
+        
+        await this.getUserInput('Press Enter to continue...');
     }
 }
 
