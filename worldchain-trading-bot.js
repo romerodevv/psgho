@@ -5128,14 +5128,30 @@ class WorldchainTradingBot {
             console.log(chalk.white(`   Last Update: ${stats.lastUpdate ? new Date(stats.lastUpdate).toLocaleString() : 'Never'}`));
         }
         
+        // Show health status
+        const health = this.priceDatabase.getHealthStatus();
+        console.log(chalk.white('\n🏥 System Health:'));
+        console.log(chalk.white(`   Overall Health: ${health.healthPercentage.toFixed(1)}%`));
+        console.log(chalk.green(`   🟢 Healthy: ${health.healthyTokens}`));
+        console.log(chalk.yellow(`   🟡 Stale: ${health.staleTokens}`));
+        console.log(chalk.red(`   🔴 Unhealthy: ${health.unhealthyTokens}`));
+        
         console.log(chalk.white('\n🪙 Tracked Tokens:'));
         const trackedTokens = this.priceDatabase.getTrackedTokens();
         if (trackedTokens && trackedTokens.length > 0) {
             trackedTokens.forEach((token, index) => {
-                console.log(chalk.white(`   ${index + 1}. ${token.symbol || 'Unknown'} (${token.address.slice(0, 10)}...)`));
-                if (token.lastPrice) {
-                    console.log(chalk.gray(`      Last Price: ${token.lastPrice.toFixed(8)} WLD`));
-                    console.log(chalk.gray(`      Updated: ${new Date(token.lastUpdate).toLocaleString()}`));
+                const failures = token.consecutiveFailures || 0;
+                const healthEmoji = failures === 0 ? '🟢' : failures < 5 ? '🟡' : '🔴';
+                
+                console.log(chalk.white(`   ${index + 1}. ${healthEmoji} ${token.symbol || 'Unknown'} (${token.address.slice(0, 10)}...)`));
+                if (token.currentPrice > 0) {
+                    console.log(chalk.gray(`      Price: ${token.currentPrice.toFixed(8)} WLD (${token.priceSource || 'unknown'})`));
+                    console.log(chalk.gray(`      Updated: ${new Date(token.lastPriceUpdate).toLocaleString()}`));
+                    if (failures > 0) {
+                        console.log(chalk.red(`      Failures: ${failures}`));
+                    }
+                } else {
+                    console.log(chalk.gray(`      No price data available`));
                 }
             });
         } else {

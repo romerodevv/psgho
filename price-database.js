@@ -33,17 +33,43 @@ class PriceDatabase extends EventEmitter {
         console.log('📊 Price Database initialized');
     }
     
-    // Add token to tracking list
-    addToken(tokenAddress, tokenInfo = {}) {
-        if (!tokenAddress || tokenAddress.toLowerCase() === this.WLD_ADDRESS.toLowerCase()) {
-            return; // Don't track WLD against itself
+    // Validate token address format
+    isValidTokenAddress(tokenAddress) {
+        if (!tokenAddress || typeof tokenAddress !== 'string') {
+            return false;
         }
         
-        this.trackedTokens.add(tokenAddress.toLowerCase());
+        // Check if it's a valid Ethereum address format
+        const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+        return addressRegex.test(tokenAddress);
+    }
+    
+    // Add token to tracking list
+    addToken(tokenAddress, tokenInfo = {}) {
+        // Validate token address
+        if (!this.isValidTokenAddress(tokenAddress)) {
+            console.log(`❌ Invalid token address format: ${tokenAddress}`);
+            return false;
+        }
+        
+        if (tokenAddress.toLowerCase() === this.WLD_ADDRESS.toLowerCase()) {
+            console.log(`⚠️  Cannot track WLD as it's the base currency`);
+            return false; // Don't track WLD against itself
+        }
+        
+        const key = tokenAddress.toLowerCase();
+        
+        // Check if already tracking
+        if (this.trackedTokens.has(key)) {
+            console.log(`⚠️  Token ${tokenInfo.symbol || tokenAddress} is already being tracked`);
+            return false;
+        }
+        
+        this.trackedTokens.add(key);
         
         // Initialize price history if not exists
-        if (!this.priceData.has(tokenAddress.toLowerCase())) {
-            this.priceData.set(tokenAddress.toLowerCase(), {
+        if (!this.priceData.has(key)) {
+            this.priceData.set(key, {
                 address: tokenAddress,
                 symbol: tokenInfo.symbol || 'Unknown',
                 name: tokenInfo.name || 'Unknown Token',
@@ -59,11 +85,16 @@ class PriceDatabase extends EventEmitter {
                 lastPriceUpdate: 0,
                 currentPrice: 0,
                 priceChange24h: 0,
-                volatility: 0
+                volatility: 0,
+                priceSource: 'none',
+                consecutiveFailures: 0,
+                lastFailure: 0,
+                addedAt: Date.now()
             });
         }
         
-        console.log(`📈 Added ${tokenInfo.symbol || tokenAddress} to price tracking`);
+        console.log(`✅ Added ${tokenInfo.symbol || tokenAddress} to price tracking`);
+        return true;
     }
     
     // Remove token from tracking
@@ -131,54 +162,139 @@ class PriceDatabase extends EventEmitter {
         
         try {
             const results = await Promise.allSettled(updatePromises);
-            const successful = results.filter(r => r.status === 'fulfilled').length;
-            const failed = results.filter(r => r.status === 'rejected').length;
             
-            console.log(`📊 Price update complete: ${successful} successful, ${failed} failed`);
+            // Count successful and failed updates more accurately
+            let successful = 0;
+            let failed = 0;
+            let cached = 0;
             
-            // Update SMA calculations
-            await this.updateAllSMACalculations();
+            results.forEach((result, index) => {
+                if (result.status === 'fulfilled') {
+                    if (result.value === true) {
+                        successful++;
+                    } else if (result.value === false) {
+                        failed++;
+                    } else {
+                        cached++; // Used cached price
+                    }
+                } else {
+                    failed++;
+                    console.log(`❌ Price update failed for token ${index}: ${result.reason}`);
+                }
+            });
             
-            // Check triggers
-            await this.checkAllTriggers();
+            // Display results with better formatting
+            if (successful > 0 || cached > 0) {
+                console.log(`📊 Price update complete: ✅ ${successful} fresh, 🔄 ${cached} cached, ❌ ${failed} failed`);
+            } else {
+                console.log(`⚠️  Price update: All ${failed} tokens failed - check network connection and token addresses`);
+            }
             
-            // Save to disk every 5 minutes
-            if (Date.now() % 300000 < this.updateInterval) {
-                this.savePriceDatabase();
+            // Only proceed with dependent operations if we have some price data
+            if (successful > 0 || cached > 0) {
+                try {
+                    // Update SMA calculations
+                    await this.updateAllSMACalculations();
+                    
+                    // Check triggers
+                    await this.checkAllTriggers();
+                } catch (dependentError) {
+                    console.log(`⚠️  Error in dependent operations: ${dependentError.message}`);
+                }
+            }
+            
+            // Save to disk every 5 minutes (but only if we have data)
+            if (Date.now() % 300000 < this.updateInterval && (successful > 0 || cached > 0)) {
+                try {
+                    this.savePriceDatabase();
+                } catch (saveError) {
+                    console.log(`⚠️  Error saving price database: ${saveError.message}`);
+                }
+            }
+            
+            // Cleanup problematic tokens every hour
+            if (Date.now() % 3600000 < this.updateInterval) {
+                try {
+                    this.cleanupProblematicTokens();
+                } catch (cleanupError) {
+                    console.log(`⚠️  Error during token cleanup: ${cleanupError.message}`);
+                }
             }
             
         } catch (error) {
-            console.error('❌ Error updating prices:', error.message);
+            console.error('❌ Unexpected error in price update cycle:', error.message);
         }
     }
     
     // Update price for a specific token
     async updateTokenPrice(tokenAddress) {
+        const priceData = this.priceData.get(tokenAddress.toLowerCase());
+        if (!priceData) return;
+        
+        let currentPrice = null;
+        let priceSource = 'unknown';
+        const timestamp = Date.now();
+        
+        // Try multiple methods to get price, with fallbacks
         try {
-            const priceData = this.priceData.get(tokenAddress.toLowerCase());
-            if (!priceData) return;
-            
-            // Get current price using HoldStation SDK
-            const quote = await this.sinclaveEngine.getHoldStationQuote(
-                tokenAddress,
-                this.WLD_ADDRESS,
-                1, // 1 token
-                '0x0000000000000000000000000000000000000001' // dummy receiver
-            );
-            
-            if (quote && quote.expectedOutput) {
-                const currentPrice = parseFloat(quote.expectedOutput);
-                const timestamp = Date.now();
+            // Method 1: Try HoldStation SDK with error handling
+            try {
+                const quote = await this.sinclaveEngine.getHoldStationQuote(
+                    tokenAddress,
+                    this.WLD_ADDRESS,
+                    1, // 1 token
+                    '0x0000000000000000000000000000000000000001' // dummy receiver
+                );
                 
+                if (quote && quote.expectedOutput && parseFloat(quote.expectedOutput) > 0) {
+                    currentPrice = parseFloat(quote.expectedOutput);
+                    priceSource = 'HoldStation';
+                    console.log(`✅ Price updated via HoldStation: ${priceData.symbol} = ${currentPrice.toFixed(8)} WLD`);
+                }
+            } catch (holdStationError) {
+                console.log(`⚠️  HoldStation failed for ${priceData.symbol}: ${holdStationError.message}`);
+                
+                // Method 2: Try direct trading engine as fallback
+                try {
+                    if (this.tradingEngine && typeof this.tradingEngine.getTokenPrice === 'function') {
+                        const enginePrice = await this.tradingEngine.getTokenPrice(tokenAddress);
+                        if (enginePrice && enginePrice.price > 0) {
+                            currentPrice = enginePrice.price;
+                            priceSource = 'TradingEngine';
+                            console.log(`✅ Price updated via TradingEngine: ${priceData.symbol} = ${currentPrice.toFixed(8)} WLD`);
+                        }
+                    }
+                } catch (engineError) {
+                    console.log(`⚠️  TradingEngine failed for ${priceData.symbol}: ${engineError.message}`);
+                }
+                
+                // Method 3: Use last known price with staleness warning
+                if (!currentPrice && priceData.currentPrice > 0) {
+                    const timeSinceLastUpdate = timestamp - priceData.lastPriceUpdate;
+                    const hoursStale = timeSinceLastUpdate / (1000 * 60 * 60);
+                    
+                    if (hoursStale < 24) { // Only use if less than 24 hours old
+                        currentPrice = priceData.currentPrice;
+                        priceSource = `Cached (${hoursStale.toFixed(1)}h old)`;
+                        console.log(`⚠️  Using cached price for ${priceData.symbol}: ${currentPrice.toFixed(8)} WLD (${hoursStale.toFixed(1)}h old)`);
+                    }
+                }
+            }
+            
+            // If we got a valid price from any source, update the data
+            if (currentPrice && currentPrice > 0) {
                 // Add to price history
                 priceData.prices.push({
                     timestamp,
-                    price: currentPrice
+                    price: currentPrice,
+                    source: priceSource
                 });
                 
-                // Update current price
+                // Update current price and metadata
                 priceData.currentPrice = currentPrice;
                 priceData.lastPriceUpdate = timestamp;
+                priceData.priceSource = priceSource;
+                priceData.consecutiveFailures = 0; // Reset failure count on success
                 
                 // Calculate 24h price change
                 const price24hAgo = this.getPriceAtTime(tokenAddress, timestamp - 86400000); // 24 hours ago
@@ -195,12 +311,35 @@ class PriceDatabase extends EventEmitter {
                     symbol: priceData.symbol,
                     price: currentPrice,
                     timestamp,
-                    change24h: priceData.priceChange24h
+                    change24h: priceData.priceChange24h,
+                    source: priceSource
                 });
                 
+                return true; // Success
+                
+            } else {
+                // No valid price obtained from any source
+                priceData.consecutiveFailures = (priceData.consecutiveFailures || 0) + 1;
+                priceData.lastFailure = timestamp;
+                
+                console.log(`❌ Failed to get price for ${priceData.symbol} (${priceData.consecutiveFailures} consecutive failures)`);
+                
+                // If too many failures, consider removing from tracking
+                if (priceData.consecutiveFailures >= 10) {
+                    console.log(`⚠️  ${priceData.symbol} has failed ${priceData.consecutiveFailures} times - consider removing from tracking`);
+                }
+                
+                return false; // Failure
             }
+            
         } catch (error) {
-            console.error(`❌ Error updating price for ${tokenAddress}:`, error.message);
+            console.error(`❌ Unexpected error updating price for ${tokenAddress}:`, error.message);
+            
+            // Track failure
+            priceData.consecutiveFailures = (priceData.consecutiveFailures || 0) + 1;
+            priceData.lastFailure = timestamp;
+            
+            return false;
         }
     }
     
@@ -217,6 +356,66 @@ class PriceDatabase extends EventEmitter {
         if (priceData.prices.length < originalLength) {
             console.log(`🧹 Cleaned ${originalLength - priceData.prices.length} old price records for ${priceData.symbol}`);
         }
+    }
+    
+    // Check for and handle problematic tokens
+    cleanupProblematicTokens() {
+        const tokensToRemove = [];
+        const currentTime = Date.now();
+        
+        for (const [tokenAddress, priceData] of this.priceData.entries()) {
+            // Remove tokens that have been failing for more than 24 hours
+            if (priceData.consecutiveFailures >= 20) {
+                const timeSinceLastSuccess = currentTime - (priceData.lastPriceUpdate || 0);
+                const hoursSinceSuccess = timeSinceLastSuccess / (1000 * 60 * 60);
+                
+                if (hoursSinceSuccess > 24) {
+                    console.log(`🗑️  Removing problematic token ${priceData.symbol} (${priceData.consecutiveFailures} failures over ${hoursSinceSuccess.toFixed(1)}h)`);
+                    tokensToRemove.push(tokenAddress);
+                }
+            }
+        }
+        
+        // Remove problematic tokens
+        for (const tokenAddress of tokensToRemove) {
+            this.removeToken(tokenAddress);
+        }
+        
+        if (tokensToRemove.length > 0) {
+            console.log(`🧹 Cleaned up ${tokensToRemove.length} problematic tokens`);
+        }
+    }
+    
+    // Get health status of price monitoring
+    getHealthStatus() {
+        const totalTokens = this.trackedTokens.size;
+        let healthyTokens = 0;
+        let unhealthyTokens = 0;
+        let staleTokens = 0;
+        
+        const currentTime = Date.now();
+        const staleThreshold = 2 * 60 * 60 * 1000; // 2 hours
+        
+        for (const [tokenAddress, priceData] of this.priceData.entries()) {
+            const timeSinceUpdate = currentTime - (priceData.lastPriceUpdate || 0);
+            const failures = priceData.consecutiveFailures || 0;
+            
+            if (failures === 0 && timeSinceUpdate < staleThreshold) {
+                healthyTokens++;
+            } else if (failures > 5) {
+                unhealthyTokens++;
+            } else if (timeSinceUpdate > staleThreshold) {
+                staleTokens++;
+            }
+        }
+        
+        return {
+            totalTokens,
+            healthyTokens,
+            unhealthyTokens,
+            staleTokens,
+            healthPercentage: totalTokens > 0 ? (healthyTokens / totalTokens * 100) : 0
+        };
     }
     
     // Update SMA calculations for all tokens
