@@ -2405,6 +2405,54 @@ class WorldchainTradingBot {
             if (enableHistoricalComparison) {
                 console.log('✅ Historical analysis enabled - strategy will compare prices across multiple timeframes.');
             }
+            
+            // Enhanced Profit Management Configuration
+            console.log('\n💰 Profit Management Mode:');
+            console.log('1. Simple Target (sell all at fixed profit %)');
+            console.log('2. Profit Range (sell portions within a range)');
+            
+            const profitModeChoice = await this.getUserInput('Select profit management mode (1-2): ');
+            let enableProfitRange = false;
+            let profitRangeMin = profitTarget;
+            let profitRangeMax = profitTarget;
+            let profitRangeSteps = 3;
+            let profitRangeMode = 'linear';
+            
+            if (profitModeChoice === '2') {
+                enableProfitRange = true;
+                console.log('\n🎯 PROFIT RANGE CONFIGURATION:');
+                console.log('Example: 5% to 25% range means start selling at 5% profit, finish at 25%');
+                
+                profitRangeMin = parseFloat(await this.getUserInput(`Minimum profit % to start selling (e.g., ${Math.max(1, profitTarget - 5)}): `));
+                profitRangeMax = parseFloat(await this.getUserInput(`Maximum profit % to finish selling (e.g., ${profitTarget + 10}): `));
+                
+                if (isNaN(profitRangeMin) || profitRangeMin <= 0) profitRangeMin = Math.max(1, profitTarget - 5);
+                if (isNaN(profitRangeMax) || profitRangeMax <= profitRangeMin) profitRangeMax = profitRangeMin + 10;
+                
+                console.log('\n📊 Selling Steps:');
+                console.log('1. 2 steps (50% at min, 50% at max)');
+                console.log('2. 3 steps (33% each - recommended)');
+                console.log('3. 4 steps (25% each)');
+                console.log('4. 5 steps (20% each)');
+                
+                const stepsChoice = await this.getUserInput('Number of selling steps (1-4): ');
+                profitRangeSteps = stepsChoice === '1' ? 2 : stepsChoice === '2' ? 3 : stepsChoice === '3' ? 4 : stepsChoice === '4' ? 5 : 3;
+                
+                console.log('\n🎯 Selling Strategy:');
+                console.log('1. Linear (equal steps across range)');
+                console.log('2. Aggressive (sell more early in range)');
+                console.log('3. Conservative (sell more later in range)');
+                
+                const modeChoice = await this.getUserInput('Select selling strategy (1-3): ');
+                profitRangeMode = modeChoice === '2' ? 'aggressive' : modeChoice === '3' ? 'conservative' : 'linear';
+                
+                console.log(`\n✅ Profit Range Configured:`);
+                console.log(`   📊 Range: ${profitRangeMin}% - ${profitRangeMax}%`);
+                console.log(`   📊 Steps: ${profitRangeSteps} (${profitRangeMode} distribution)`);
+                console.log(`   💡 Strategy will sell portions as profit increases within this range`);
+            } else {
+                console.log(`✅ Simple profit target: ${profitTarget}% (sell all positions at once)`);
+            }
 
             // Validation
             if (isNaN(dipThreshold) || dipThreshold <= 0 || dipThreshold > 50) {
@@ -2438,7 +2486,13 @@ class WorldchainTradingBot {
                 maxSlippage,
                 priceCheckInterval: 30000, // 30 seconds for responsive monitoring
                 dipTimeframe,
-                enableHistoricalComparison
+                enableHistoricalComparison,
+                // Profit Range Configuration
+                enableProfitRange,
+                profitRangeMin,
+                profitRangeMax,
+                profitRangeSteps,
+                profitRangeMode
             };
 
             const strategyId = await this.strategyBuilder.createStrategy(strategyConfig);
@@ -2448,7 +2502,13 @@ class WorldchainTradingBot {
             console.log(`📊 Name: ${name}`);
             console.log(`💱 Pair: WLD → ${tokenInfo.symbol} (${tokenInfo.name})`);
             console.log(`📉 DIP Threshold: ${dipThreshold}% drop from highest in ${dipTimeframeLabel}`);
-            console.log(`📈 Profit Target: ${profitTarget}%`);
+            
+            if (enableProfitRange) {
+                console.log(`📈 Profit Range: ${profitRangeMin}% - ${profitRangeMax}% (${profitRangeSteps} steps, ${profitRangeMode} mode)`);
+            } else {
+                console.log(`📈 Profit Target: ${profitTarget}% (simple mode)`);
+            }
+            
             console.log(`💰 Trade Amount: ${tradeAmount} WLD`);
             console.log(`⏱️ Monitoring: Every 30s, DIP detection over ${dipTimeframeLabel}`);
             console.log(`📊 Historical Analysis: ${enableHistoricalComparison ? 'ENABLED' : 'DISABLED'}`);

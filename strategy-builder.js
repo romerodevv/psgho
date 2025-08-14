@@ -45,9 +45,16 @@ class StrategyBuilder extends EventEmitter {
             
             // Trading parameters
             dipThreshold: config.dipThreshold || 15, // % drop to trigger buy
-            profitTarget: config.profitTarget || 1, // % gain to trigger sell
+            profitTarget: config.profitTarget || 1, // % gain to trigger sell (legacy/simple mode)
             tradeAmount: config.tradeAmount || 0.1, // WLD amount per trade
             maxSlippage: config.maxSlippage || 1, // Max slippage %
+            
+            // Enhanced Profit Range Settings
+            enableProfitRange: config.enableProfitRange || false,
+            profitRangeMin: config.profitRangeMin || config.profitTarget || 1, // Min % to start selling
+            profitRangeMax: config.profitRangeMax || (config.profitTarget || 1) * 2, // Max % to finish selling
+            profitRangeSteps: config.profitRangeSteps || 3, // Number of partial sells in range
+            profitRangeMode: config.profitRangeMode || 'linear', // 'linear', 'aggressive', 'conservative'
             
             // Enhanced DIP detection settings
             priceCheckInterval: config.priceCheckInterval || 30000, // 30 seconds for more frequent checks
@@ -82,7 +89,13 @@ class StrategyBuilder extends EventEmitter {
         console.log(`✅ Strategy created: ${strategy.name} (${strategyId})`);
         console.log(`   📊 Pair: WLD → ${config.tokenSymbol}`);
         console.log(`   📉 DIP Trigger: ${config.dipThreshold}% drop from highest in ${strategy.dipTimeframeLabel}`);
-        console.log(`   📈 Profit Target: ${config.profitTarget}%`);
+        
+        if (strategy.enableProfitRange) {
+            console.log(`   📈 Profit Range: ${strategy.profitRangeMin}% - ${strategy.profitRangeMax}% (${strategy.profitRangeSteps} steps, ${strategy.profitRangeMode} mode)`);
+        } else {
+            console.log(`   📈 Profit Target: ${config.profitTarget}% (simple mode)`);
+        }
+        
         console.log(`   💰 Trade Amount: ${config.tradeAmount} WLD`);
         console.log(`   ⏱️ Price Checks: Every ${strategy.priceCheckInterval / 1000}s`);
         
@@ -645,7 +658,7 @@ class StrategyBuilder extends EventEmitter {
         }
     }
     
-    // Check position for profit target based on AVERAGE PRICE
+    // Enhanced position monitoring with PROFIT RANGE support
     async checkPositionForProfit(strategy, position) {
         try {
             // Calculate current average price from all open positions
@@ -659,7 +672,6 @@ class StrategyBuilder extends EventEmitter {
             });
             
             const averagePrice = totalWLD / totalTokens;
-            const targetPrice = averagePrice * (1 + strategy.profitTarget / 100);
             
             // Get current market price using a small test amount
             const testQuote = await this.sinclaveEngine.getHoldStationQuote(
@@ -681,29 +693,220 @@ class StrategyBuilder extends EventEmitter {
                 position.unrealizedPnL = unrealizedPnL;
                 position.unrealizedPnLPercent = unrealizedPnLPercent;
                 
-                console.log(`📊 Portfolio Status for ${strategy.name}:`);
-                console.log(`   📊 Average Price: ${averagePrice.toFixed(8)} WLD per token`);
-                console.log(`   📊 Current Price: ${currentPrice.toFixed(8)} WLD per token`);
-                console.log(`   📊 Target Price: ${targetPrice.toFixed(8)} WLD per token`);
-                console.log(`   💰 Total Investment: ${totalWLD.toFixed(6)} WLD`);
-                console.log(`   📈 Current Value: ${totalCurrentValue.toFixed(6)} WLD`);
-                console.log(`   💹 Unrealized P&L: ${unrealizedPnL.toFixed(6)} WLD (${unrealizedPnLPercent.toFixed(2)}%)`);
-                
-                // Check if profit target is reached BASED ON AVERAGE PRICE
-                if (currentPrice >= targetPrice) {
-                    console.log(`🎯 PROFIT TARGET REACHED for ${strategy.name}!`);
-                    console.log(`   📊 Current price (${currentPrice.toFixed(8)}) >= Target (${targetPrice.toFixed(8)})`);
-                    console.log(`   📊 Portfolio profit: ${unrealizedPnLPercent.toFixed(2)}% (Target: ${strategy.profitTarget}%)`);
-                    console.log(`   💰 Expected return: ${totalCurrentValue.toFixed(6)} WLD`);
-                    console.log(`   🚀 Executing profit sell for ALL positions...`);
+                if (strategy.enableProfitRange) {
+                    // ENHANCED PROFIT RANGE MODE
+                    await this.handleProfitRange(strategy, openPositions, currentPrice, averagePrice, totalWLD, totalTokens, unrealizedPnLPercent);
+                } else {
+                    // LEGACY SIMPLE PROFIT TARGET MODE
+                    const targetPrice = averagePrice * (1 + strategy.profitTarget / 100);
                     
-                    // Sell ALL positions since we calculate profit based on average
-                    await this.executeProfitSellAll(strategy, openPositions, currentPrice);
+                    console.log(`📊 Portfolio Status for ${strategy.name} (Simple Mode):`);
+                    console.log(`   📊 Average Price: ${averagePrice.toFixed(8)} WLD per token`);
+                    console.log(`   📊 Current Price: ${currentPrice.toFixed(8)} WLD per token`);
+                    console.log(`   📊 Target Price: ${targetPrice.toFixed(8)} WLD per token`);
+                    console.log(`   💰 Total Investment: ${totalWLD.toFixed(6)} WLD`);
+                    console.log(`   📈 Current Value: ${totalCurrentValue.toFixed(6)} WLD`);
+                    console.log(`   💹 Unrealized P&L: ${unrealizedPnL.toFixed(6)} WLD (${unrealizedPnLPercent.toFixed(2)}%)`);
+                    
+                    // Check if profit target is reached BASED ON AVERAGE PRICE
+                    if (currentPrice >= targetPrice) {
+                        console.log(`🎯 PROFIT TARGET REACHED for ${strategy.name}!`);
+                        console.log(`   📊 Current price (${currentPrice.toFixed(8)}) >= Target (${targetPrice.toFixed(8)})`);
+                        console.log(`   📊 Portfolio profit: ${unrealizedPnLPercent.toFixed(2)}% (Target: ${strategy.profitTarget}%)`);
+                        console.log(`   💰 Expected return: ${totalCurrentValue.toFixed(6)} WLD`);
+                        console.log(`   🚀 Executing profit sell for ALL positions...`);
+                        
+                        // Sell ALL positions since we calculate profit based on average
+                        await this.executeProfitSellAll(strategy, openPositions, currentPrice);
+                    }
                 }
             }
             
         } catch (error) {
             console.error(`❌ Error checking position ${position.id}:`, error.message);
+        }
+    }
+    
+    // Handle sophisticated profit range selling
+    async handleProfitRange(strategy, openPositions, currentPrice, averagePrice, totalWLD, totalTokens, unrealizedPnLPercent) {
+        try {
+            // Initialize profit range tracking if not exists
+            if (!strategy.profitRangeState) {
+                strategy.profitRangeState = {
+                    sellSteps: [],
+                    totalSold: 0,
+                    remainingPositions: [...openPositions]
+                };
+                
+                // Calculate sell steps based on range and mode
+                this.calculateProfitRangeSteps(strategy);
+            }
+            
+            // Update trigger prices based on current average price
+            const rangeState = strategy.profitRangeState;
+            rangeState.sellSteps.forEach(step => {
+                if (!step.executed) {
+                    step.triggerPrice = averagePrice * (1 + step.profitPercent / 100);
+                    step.expectedTokens = totalTokens * (step.sellPercentage / 100);
+                }
+            });
+            const minPrice = averagePrice * (1 + strategy.profitRangeMin / 100);
+            const maxPrice = averagePrice * (1 + strategy.profitRangeMax / 100);
+            
+            console.log(`📊 Portfolio Status for ${strategy.name} (Profit Range Mode):`);
+            console.log(`   📊 Average Price: ${averagePrice.toFixed(8)} WLD per token`);
+            console.log(`   📊 Current Price: ${currentPrice.toFixed(8)} WLD per token`);
+            console.log(`   📊 Profit Range: ${strategy.profitRangeMin}% - ${strategy.profitRangeMax}%`);
+            console.log(`   📊 Price Range: ${minPrice.toFixed(8)} - ${maxPrice.toFixed(8)} WLD`);
+            console.log(`   💰 Total Investment: ${totalWLD.toFixed(6)} WLD`);
+            console.log(`   📈 Current Value: ${(totalTokens * currentPrice).toFixed(6)} WLD`);
+            console.log(`   💹 Unrealized P&L: ${unrealizedPnLPercent.toFixed(2)}%`);
+            
+            // Check if we're in the profit range
+            if (currentPrice >= minPrice) {
+                console.log(`🎯 ENTERED PROFIT RANGE for ${strategy.name}!`);
+                
+                // Find which sell step we should execute
+                const applicableSteps = rangeState.sellSteps.filter(step => 
+                    currentPrice >= step.triggerPrice && !step.executed
+                );
+                
+                if (applicableSteps.length > 0) {
+                    // Execute the highest applicable step
+                    const stepToExecute = applicableSteps.sort((a, b) => b.triggerPrice - a.triggerPrice)[0];
+                    
+                    console.log(`📊 Executing Profit Range Step ${stepToExecute.stepNumber}:`);
+                    console.log(`   📈 Trigger: ${stepToExecute.profitPercent}% (${stepToExecute.triggerPrice.toFixed(8)} WLD)`);
+                    console.log(`   💰 Sell Amount: ${stepToExecute.sellPercentage}% of remaining positions`);
+                    console.log(`   🎯 Expected: ${stepToExecute.expectedTokens.toFixed(6)} tokens`);
+                    
+                    await this.executeProfitRangeStep(strategy, stepToExecute, currentPrice);
+                } else {
+                    // Show range progress
+                    const rangeProgress = Math.min(100, ((currentPrice - minPrice) / (maxPrice - minPrice)) * 100);
+                    console.log(`   📊 Range Progress: ${rangeProgress.toFixed(1)}% through profit range`);
+                    
+                    const nextStep = rangeState.sellSteps.find(step => !step.executed);
+                    if (nextStep) {
+                        console.log(`   ⏳ Next Sell: ${nextStep.profitPercent}% at ${nextStep.triggerPrice.toFixed(8)} WLD`);
+                    }
+                }
+            } else {
+                // Show how close we are to profit range
+                const progressToRange = ((currentPrice - averagePrice) / (minPrice - averagePrice)) * 100;
+                console.log(`   ⏳ Progress to Range: ${Math.max(0, progressToRange).toFixed(1)}% (need ${((minPrice - currentPrice) / currentPrice * 100).toFixed(2)}% more)`);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error handling profit range:`, error.message);
+        }
+    }
+    
+    // Calculate profit range sell steps
+    calculateProfitRangeSteps(strategy) {
+        const rangeState = strategy.profitRangeState;
+        const steps = strategy.profitRangeSteps;
+        const minPercent = strategy.profitRangeMin;
+        const maxPercent = strategy.profitRangeMax;
+        
+        rangeState.sellSteps = [];
+        
+        for (let i = 0; i < steps; i++) {
+            let profitPercent, sellPercentage;
+            
+            // Calculate profit percentage for this step
+            if (strategy.profitRangeMode === 'linear') {
+                // Even distribution across range
+                profitPercent = minPercent + (maxPercent - minPercent) * (i + 1) / steps;
+                sellPercentage = 100 / steps; // Sell equal portions
+            } else if (strategy.profitRangeMode === 'aggressive') {
+                // More selling early in the range
+                profitPercent = minPercent + (maxPercent - minPercent) * Math.pow((i + 1) / steps, 0.5);
+                sellPercentage = i === 0 ? 50 : (100 - 50) / (steps - 1); // 50% first, then split remainder
+            } else if (strategy.profitRangeMode === 'conservative') {
+                // More selling later in the range
+                profitPercent = minPercent + (maxPercent - minPercent) * Math.pow((i + 1) / steps, 2);
+                sellPercentage = i === steps - 1 ? 50 : (100 - 50) / (steps - 1); // Split most, 50% at end
+            }
+            
+            const step = {
+                stepNumber: i + 1,
+                profitPercent: profitPercent,
+                triggerPrice: 0, // Will be calculated when positions exist
+                sellPercentage: sellPercentage,
+                expectedTokens: 0, // Will be calculated when positions exist
+                executed: false,
+                executedAt: null,
+                actualTokensSold: 0,
+                actualWLDReceived: 0
+            };
+            
+            rangeState.sellSteps.push(step);
+        }
+        
+        console.log(`📊 Profit Range Steps Calculated (${strategy.profitRangeMode} mode):`);
+        rangeState.sellSteps.forEach(step => {
+            console.log(`   Step ${step.stepNumber}: ${step.profitPercent.toFixed(1)}% profit → Sell ${step.sellPercentage.toFixed(1)}%`);
+        });
+    }
+    
+    // Execute a specific profit range step
+    async executeProfitRangeStep(strategy, step, currentPrice) {
+        try {
+            const openPositions = strategy.positions.filter(p => p.status === 'open');
+            const totalTokens = openPositions.reduce((sum, pos) => sum + pos.entryAmountToken, 0);
+            const tokensToSell = totalTokens * (step.sellPercentage / 100);
+            
+            console.log(`🚀 Executing Profit Range Step ${step.stepNumber}...`);
+            console.log(`   📊 Selling ${tokensToSell.toFixed(6)} tokens (${step.sellPercentage}% of ${totalTokens.toFixed(6)})`);
+            
+            // Execute the partial sell
+            const sellResult = await this.sinclaveEngine.executeOptimizedSwap(
+                strategy.walletObject,
+                strategy.targetToken,
+                this.WLD_ADDRESS,
+                tokensToSell,
+                strategy.maxSlippage
+            );
+            
+            if (sellResult.success) {
+                step.executed = true;
+                step.executedAt = Date.now();
+                step.actualTokensSold = tokensToSell;
+                step.actualWLDReceived = parseFloat(sellResult.amountOut);
+                
+                // Update positions proportionally
+                const sellRatio = tokensToSell / totalTokens;
+                openPositions.forEach(pos => {
+                    const soldFromPosition = pos.entryAmountToken * sellRatio;
+                    pos.entryAmountToken -= soldFromPosition;
+                    pos.entryAmountWLD -= pos.entryAmountWLD * sellRatio;
+                    
+                    if (pos.entryAmountToken < 0.000001) {
+                        pos.status = 'closed';
+                        pos.exitPrice = currentPrice;
+                        pos.exitTimestamp = Date.now();
+                    }
+                });
+                
+                // Update strategy stats
+                strategy.totalTrades++;
+                strategy.successfulTrades++;
+                strategy.totalProfit += step.actualWLDReceived - (tokensToSell / currentPrice); // Approximate profit
+                
+                console.log(`✅ Profit Range Step ${step.stepNumber} Executed Successfully!`);
+                console.log(`   💰 Sold: ${step.actualTokensSold.toFixed(6)} tokens`);
+                console.log(`   💰 Received: ${step.actualWLDReceived.toFixed(6)} WLD`);
+                console.log(`   📊 Remaining Positions: ${openPositions.filter(p => p.status === 'open').length}`);
+                
+                this.saveStrategies();
+                
+            } else {
+                console.log(`❌ Profit Range Step ${step.stepNumber} Failed: ${sellResult.error}`);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error executing profit range step:`, error.message);
         }
     }
     
