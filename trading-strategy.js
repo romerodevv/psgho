@@ -375,7 +375,11 @@ class TradingStrategy extends EventEmitter {
             
             console.log(`✅ Position closed: ${position.id}`);
             console.log(`📊 Exit: ${position.entryAmountToken} tokens -> ${exitAmountWLD} WLD at ${currentPrice.toFixed(8)} WLD/token`);
-            console.log(`💰 P&L: ${realizedPnL.toFixed(4)} WLD (${realizedPnLPercent.toFixed(2)}%)`);
+            
+            // Color code P&L: Green for profit, Red for loss
+            const pnlColor = realizedPnLPercent >= 0 ? '\x1b[32m' : '\x1b[31m'; // Green or Red
+            const resetColor = '\x1b[0m'; // Reset color
+            console.log(`${pnlColor}💰 P&L: ${realizedPnL.toFixed(4)} WLD (${realizedPnLPercent.toFixed(2)}%)${resetColor}`);
             
             this.emit('positionClosed', position);
             return position;
@@ -582,7 +586,12 @@ class TradingStrategy extends EventEmitter {
                 console.log(`📊 Position ${position.id} status:`);
                 console.log(`   💰 Entry: ${position.entryAmountWLD} WLD → ${position.entryAmountToken} tokens`);
                 console.log(`   📈 Current: ${position.entryAmountToken} tokens → ${currentWLDValue.toFixed(6)} WLD`);
-                console.log(`   📊 P&L: ${unrealizedPnL.toFixed(6)} WLD (${unrealizedPnLPercent.toFixed(2)}%)`);
+                
+                // Color code P&L: Green for profit, Red for loss
+                const pnlColor = unrealizedPnLPercent >= 0 ? '\x1b[32m' : '\x1b[31m'; // Green or Red
+                const resetColor = '\x1b[0m'; // Reset color
+                console.log(`   ${pnlColor}📊 P&L: ${unrealizedPnL.toFixed(6)} WLD (${unrealizedPnLPercent.toFixed(2)}%)${resetColor}`);
+                
                 console.log(`   🎯 Target: ${position.profitTarget}% | 🛑 Stop: ${position.stopLoss}%`);
                 console.log(`   🔄 Swap Available: ${canExecuteReverseSwap ? '✅' : '❌'}`);
             }

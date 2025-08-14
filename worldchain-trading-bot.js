@@ -1899,11 +1899,18 @@ class WorldchainTradingBot {
         const input = await this.getUserInput(`Enter profit target % (current: ${current}%): `);
         
         const value = parseFloat(input);
-        if (value && value > 0 && value <= 100) {
+        // Allow any reasonable profit target: 0.01% to 999%
+        if (!isNaN(value) && value > 0 && value <= 999) {
             this.tradingStrategy.updateConfig({ profitTarget: value });
             console.log(chalk.green(`✅ Profit target set to ${value}%`));
+            
+            if (value < 0.1) {
+                console.log(chalk.yellow('💡 Very low profit target - trades may execute frequently'));
+            } else if (value > 50) {
+                console.log(chalk.yellow('⚠️ Very high profit target - trades may execute rarely'));
+            }
         } else {
-            console.log(chalk.red('❌ Invalid profit target'));
+            console.log(chalk.red('❌ Invalid profit target. Please enter a number between 0.01% and 999%'));
         }
         
         await this.sleep(1500);
@@ -1915,11 +1922,18 @@ class WorldchainTradingBot {
         const input = await this.getUserInput(`Enter DIP buy threshold % (current: ${current}%): `);
         
         const value = parseFloat(input);
-        if (value && value > 0 && value <= 50) {
+        // Allow any reasonable DIP threshold: 0.1% to 99%
+        if (!isNaN(value) && value > 0 && value <= 99) {
             this.tradingStrategy.updateConfig({ dipBuyThreshold: value });
             console.log(chalk.green(`✅ DIP buy threshold set to ${value}%`));
+            
+            if (value < 1) {
+                console.log(chalk.yellow('💡 Very low DIP threshold - may trigger on minor price movements'));
+            } else if (value > 30) {
+                console.log(chalk.yellow('⚠️ Very high DIP threshold - may rarely trigger'));
+            }
         } else {
-            console.log(chalk.red('❌ Invalid DIP threshold'));
+            console.log(chalk.red('❌ Invalid DIP threshold. Please enter a number between 0.1% and 99%'));
         }
         
         await this.sleep(1500);
@@ -1947,11 +1961,20 @@ class WorldchainTradingBot {
         const input = await this.getUserInput(`Enter stop loss % (current: ${current}%): `);
         
         const value = parseFloat(input);
-        if (value && value < 0 && value >= -50) {
+        // Allow any reasonable stop loss value: -99% to +99%
+        // Negative values are traditional stop losses (sell at loss)
+        // Positive values can be used for profit protection (trailing stops)
+        if (!isNaN(value) && value >= -99 && value <= 99) {
             this.tradingStrategy.updateConfig({ stopLossThreshold: value });
             console.log(chalk.green(`✅ Stop loss set to ${value}%`));
+            
+            if (value > 0) {
+                console.log(chalk.yellow('💡 Positive stop loss acts as profit protection'));
+            } else if (value < -50) {
+                console.log(chalk.yellow('⚠️ Very high stop loss - positions may incur large losses'));
+            }
         } else {
-            console.log(chalk.red('❌ Invalid stop loss value'));
+            console.log(chalk.red('❌ Invalid stop loss value. Please enter a number between -99% and +99%'));
         }
         
         await this.sleep(1500);
