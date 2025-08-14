@@ -1,309 +1,296 @@
-# 🌍 WorldChain Trading Bot
+# 🤖 ALGORITMIT - Worldchain Machine Learning Trading Bot
 
-An advanced, fully interactive trading bot for Worldchain with ATM-style interface, featuring wallet management, automatic token discovery, and high-speed WLD pair trading.
+**The most advanced AI-powered trading bot for Worldchain with machine learning capabilities.**
 
-## 🚀 Features
+## 🚀 Quick Installation
 
-### 💼 Wallet Management
-- **Create New Wallets**: Generate secure wallets with private keys
-- **Import Existing Wallets**: Import wallets using private keys
-- **Wallet Operations**: List, remove, and check balances of all wallets
-- **Multi-Wallet Support**: Manage multiple wallets simultaneously
-- **Balance Tracking**: Real-time ETH and WLD balance monitoring
-
-### 🔍 Token Discovery & Portfolio
-- **Automatic Token Discovery**: Scan wallets for existing tokens
-- **Manual Token Addition**: Add tokens by contract address
-- **Portfolio Tracking**: Real-time portfolio value calculation
-- **Token Information**: Fetch name, symbol, decimals automatically
-- **WLD Pair Creation**: Automatically create WLD trading pairs
-
-### 📈 Trading Operations
-- **Interactive Trading**: Select wallet, pair, and execute trades
-- **WLD-Based Pairs**: All trading pairs are WLD-based (WLD-ORO, WLD-YIELD, etc.)
-- **High-Speed Mode**: Automated high-frequency trading capabilities
-- **Price Monitoring**: Real-time price tracking and alerts
-- **Trade History**: Complete transaction history with details
-
-### 🎯 Advanced Trading Strategy
-- **Automated Position Tracking**: Records entry price and monitors P&L in real-time
-- **Profit Target System**: Automatically sells when target profit is reached (configurable %)
-- **DIP Buying**: Detects price dips and alerts for buying opportunities
-- **Stop Loss Protection**: Automatic selling when losses exceed threshold
-- **Trailing Stop**: Dynamic stop loss that follows profitable positions
-- **Price Discovery**: Uses swap quotes to determine current token prices
-- **Risk Management**: Configurable position sizes and maximum open positions
-- **Real-time Monitoring**: Price checks every 5 seconds (configurable)
-
-### ⚙️ Configuration
-- **Trading Settings**: Configurable slippage tolerance and trading parameters
-- **Gas Configuration**: Customizable gas price and limits
-- **Auto-Discovery**: Automated token discovery settings
-- **Persistent Storage**: All settings saved locally
-
-### 🎨 User Interface
-- **ATM-Style Interface**: Intuitive menu-driven navigation
-- **Colorful CLI**: Beautiful terminal interface with colors and emojis
-- **Real-time Feedback**: Live updates and progress indicators
-- **Error Handling**: Comprehensive error messages and recovery
-
-## 📋 Requirements
-
-- **Node.js**: Version 16.0.0 or higher
-- **NPM**: Latest version
-- **Internet Connection**: For blockchain interactions
-- **Terminal**: Command line interface
-
-## 🛠️ Installation
-
-1. **Clone or Download** the project files
-2. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
-3. **Make Executable** (Optional):
-   ```bash
-   chmod +x worldchain-trading-bot.js
-   ```
-
-## 🚀 Usage
-
-### Start the Bot
+### One-Line Install (Recommended)
 ```bash
-npm start
+curl -fsSL https://raw.githubusercontent.com/your-username/worldchain-algoritmit-bot/main/install-algoritmit.sh | bash
 ```
 
-Or run directly:
+### Manual Installation
 ```bash
+git clone https://github.com/your-username/worldchain-algoritmit-bot.git
+cd worldchain-algoritmit-bot
+npm install
+./install-holdstation-sdk.sh
+cp .env.example .env
+# Edit .env with your settings
 node worldchain-trading-bot.js
 ```
 
-### Main Menu Options
+## ✨ New Features - ALGORITMIT v3.0
 
-1. **💼 Wallet Management**
-   - Create new wallets
-   - Import existing wallets
-   - View wallet list and balances
-   - Remove wallets
+### 🤖 Machine Learning Trading Strategy
+- **Linear Regression Models**: Predicts price movements based on historical trends
+- **Pattern Recognition**: Identifies bullish, bearish, and neutral market patterns
+- **Automated Learning**: Continuously improves from market data
+- **Risk-Adjusted Trading**: Position sizing based on confidence and volatility
+- **Real-time Adaptation**: Models retrain automatically every 24 hours
 
-2. **🔍 Token Discovery & Portfolio**
-   - Discover tokens in all wallets
-   - Add tokens by contract address
-   - View discovered tokens
-   - Portfolio summary
+### 🧠 AI-Powered Decision Making
+- **Multi-Signal Analysis**: Combines multiple ML algorithms for trading decisions
+- **Confidence Scoring**: Only trades when AI is highly confident (configurable 50-95%)
+- **Feature Engineering**: Extracts technical indicators automatically
+- **Pattern Memory**: Learns from successful and failed trades
 
-3. **📈 Trading Operations**
-   - Execute trades
-   - View trading pairs
-   - High-speed trading mode
-   - Price monitoring
-   - Trade history
+### 📊 Advanced Analytics
+- **ML Accuracy Tracking**: Monitor prediction performance in real-time
+- **Training Data Visualization**: See how much data the AI has learned from
+- **Performance Metrics**: Win rate, profit/loss, and model effectiveness
+- **Learning Progress**: Track AI improvement over time
 
-4. **🎯 Strategy Management**
-   - Start/Stop automated strategy
-   - Execute strategic trades with position tracking
-   - View open and closed positions
-   - Configure profit targets and stop losses
-   - Real-time P&L monitoring
-   - DIP buying opportunities
+## 🎯 Core Features
 
-5. **⚙️ Configuration**
-   - Trading settings
-   - Gas configuration
-   - Auto-discovery settings
-   - Strategy parameters
+### 💹 Trading Capabilities
+- **HoldStation SDK Integration**: Native Worldchain DEX support
+- **Uniswap V3 Fallback**: Backup trading infrastructure
+- **Multi-Wallet Support**: Manage multiple trading wallets
+- **Token Discovery**: Automatic detection of wallet holdings
+- **Slippage Protection**: Configurable slippage limits
 
-6. **📊 Portfolio Overview**
-   - Complete portfolio summary
-   - Total value calculation
-   - Token distribution
+### 🏗️ Strategy Builder
+- **Custom DIP/Profit Strategies**: Create personalized trading rules
+- **Price History Analysis**: Compare prices across different timeframes
+- **SMA Integration**: Simple Moving Average-based trading signals
+- **Profit Range Selling**: Sell portions at different profit levels
+- **Console Commands**: Quick trade execution via command line
 
-## 🔐 Security Features
+### 🎯 Price Triggers & Automation
+- **Background Price Monitoring**: Continuous price tracking for all tokens
+- **Trigger-Based Trading**: Execute trades based on price conditions
+- **Historical Comparisons**: Trade based on 5min, 1hr, 6hr, 24hr, 7-day data
+- **Smart Notifications**: Alerts for significant price movements
 
-- **Local Storage**: All data stored locally in JSON files
-- **Private Key Protection**: Secure private key handling
-- **Input Validation**: Comprehensive input validation
-- **Error Recovery**: Graceful error handling and recovery
+## 🛡️ Safety & Risk Management
 
-## 📁 File Structure
+### 🔒 Built-in Safety Features
+- **Learning Mode**: AI learns without trading for 24+ hours first
+- **Position Limits**: Configurable maximum position sizes
+- **Confidence Thresholds**: Only trade with high-confidence predictions
+- **Stop Loss Protection**: Automatic loss prevention
+- **Manual Override**: Disable auto-trading anytime
 
+### 📋 Recommended Safety Protocol
+1. **Phase 1 (Days 1-2)**: Enable Learning Mode only
+2. **Phase 2 (Days 3-7)**: Start auto-trading with 0.01 WLD positions  
+3. **Phase 3 (Days 8+)**: Scale up gradually based on performance
+
+## ⚙️ Configuration
+
+### Environment Variables (.env)
+```env
+# Wallet Configuration
+PRIVATE_KEY_1=your_private_key_here
+WALLET_NAME_1=Main Trading Wallet
+
+# RPC Configuration
+WORLDCHAIN_RPC_URL=https://worldchain-mainnet.g.alchemy.com/public
+ALCHEMY_API_KEY=your_alchemy_api_key
+
+# ALGORITMIT ML Settings
+ML_CONFIDENCE_THRESHOLD=75        # 50-95% (higher = fewer but better trades)
+ML_MAX_POSITION_SIZE=0.1          # Maximum WLD per trade
+ML_LEARNING_MODE=true             # Start with learning only
+ML_AUTO_TRADING=false             # Enable after learning period
 ```
-worldchain-trading-bot/
-├── worldchain-trading-bot.js    # Main bot application
-├── package.json                 # Dependencies and scripts
-├── README.md                   # This file
-├── config.json                 # Bot configuration (auto-created)
-├── wallets.json               # Wallet storage (auto-created)
-└── discovered_tokens.json     # Token storage (auto-created)
+
+### ALGORITMIT Parameters
+- **Confidence Threshold**: 70%+ for high confidence trades
+- **Max Position Size**: Start with 0.01-0.1 WLD
+- **Risk Tolerance**: 1-20% position adjustment
+- **Learning Period**: 50-500 data points for training
+
+## 📊 Usage Guide
+
+### Getting Started with ALGORITMIT
+
+1. **Launch the Bot**
+   ```bash
+   ./start-algoritmit.sh
+   ```
+
+2. **Access ALGORITMIT Menu**
+   - Main Menu → Option 7 (🤖 ALGORITMIT)
+
+3. **Enable Learning Mode**
+   - Select "1. Enable/Disable ALGORITMIT" → Enable
+   - Select "2. Configure Learning Mode" → Enable
+   - Let it run for 24-48 hours
+
+4. **Monitor ML Statistics**
+   - Select "4. View ML Statistics"
+   - Wait for 60%+ accuracy before auto-trading
+
+5. **Enable Auto-Trading (Carefully!)**
+   - Select "3. Configure Auto-Trading Mode"
+   - Type "CONFIRM" to enable
+   - Start with minimal position sizes
+
+### Key Menu Options
+
+#### Main Features
+- **🏠 Wallet Management**: Create, import, and manage wallets
+- **🔍 Token Discovery**: Find tokens in your wallets automatically
+- **📈 Trading Operations**: Execute manual trades with enhanced routing
+- **🎯 Strategy Management**: Traditional DIP/profit strategies
+- **🏗️ Strategy Builder**: Custom trading strategies
+- **🎯 Price Triggers**: Automated buy/sell based on price conditions
+- **🤖 ALGORITMIT**: Machine learning trading system ⭐ NEW!
+
+#### ALGORITMIT Submenu
+- **Enable/Disable**: Turn the AI trading system on/off
+- **Learning Mode**: Configure data collection and training
+- **Auto-Trading**: Enable/disable automated trade execution
+- **ML Statistics**: View AI performance and accuracy
+- **Parameters**: Configure confidence, position sizes, risk tolerance
+- **Active Positions**: Monitor AI-managed trades
+- **Model Retraining**: Force model updates with new data
+- **Tutorial**: Complete guide to ML trading
+
+## 🔧 Advanced Features
+
+### Console Commands
+Quick trade execution via command line interface:
+```bash
+buy YIELD 0.10 d15 p15    # Buy YIELD with 0.10 WLD, 15% DIP, 15% profit
+buy YIELD 0.10            # Immediate buy with 0.10 WLD
+sell YIELD all            # Sell all YIELD tokens
+buy YIELD 1h              # Buy at best rate from last hour
 ```
 
-## 🌐 Worldchain Integration
+### Service Management
+Run as a background service:
+```bash
+# Using PM2
+npm install -g pm2
+pm2 start worldchain-trading-bot.js --name "algoritmit-bot"
 
-### Network Configuration
-- **RPC Endpoint**: Worldchain Mainnet
-- **Chain ID**: Worldchain Layer 2
-- **WLD Token**: Primary trading token
-- **DEX Integration**: Uniswap V3 compatible
+# Using systemd (advanced)
+./create-service.sh
+sudo systemctl enable algoritmit-bot
+sudo systemctl start algoritmit-bot
+```
 
-### Trading Pairs
-All trading pairs are WLD-based:
-- WLD-ORO
-- WLD-YIELD
-- WLD-[ANY_TOKEN]
+## 📚 Documentation
 
-## ⚡ High-Speed Trading
+### Complete Guides
+- **[ALGORITMIT_GUIDE.md](ALGORITMIT_GUIDE.md)**: Comprehensive ML trading guide
+- **[INSTALL_ALGORITMIT.md](INSTALL_ALGORITMIT.md)**: Detailed installation instructions
+- **In-App Tutorial**: ALGORITMIT menu → option 8
 
-The bot includes high-frequency trading capabilities:
-- **Rapid Execution**: Sub-second trade execution
-- **Market Monitoring**: Real-time price movement analysis
-- **Automated Strategies**: Configurable trading algorithms
-- **Risk Management**: Built-in risk controls
+### API References
+- **HoldStation SDK**: Primary DEX integration for Worldchain
+- **Ethers.js v6**: Blockchain interaction library
+- **Alchemy API**: Portfolio and balance management
 
-## 🔧 Configuration Options
+## ⚠️ Important Disclaimers
 
-### Trading Settings
-- **Slippage Tolerance**: Default 0.5%
-- **Trading Enabled**: Enable/disable trading
-- **Gas Price**: Configurable gas price in Gwei
-- **Gas Limit**: Maximum gas limit per transaction
+### Financial Risks
+- **Real Money Trading**: This bot uses real cryptocurrency
+- **No Profit Guarantees**: Past performance doesn't predict future results
+- **Market Volatility**: Crypto markets are highly volatile
+- **Start Small**: Always begin with amounts you can afford to lose
 
-### Auto-Discovery
-- **Enable/Disable**: Automatic token discovery
-- **Refresh Interval**: Token discovery frequency
-- **Portfolio Updates**: Automatic balance updates
+### Technical Considerations
+- **Beta Software**: May contain bugs or unexpected behavior
+- **Machine Learning Limitations**: AI predictions can be wrong
+- **Internet Dependency**: Requires stable internet connection
+- **Continuous Monitoring**: Regular supervision recommended
 
-## 📊 Token Discovery
-
-The bot automatically discovers tokens by:
-1. Scanning wallet transactions
-2. Checking token balances
-3. Fetching token metadata
-4. Creating WLD trading pairs
-5. Adding to portfolio tracking
-
-## 🎯 Use Cases
-
-- **Strategic Trading**: Automated position tracking with profit targets
-- **DeFi Trading**: Automated DeFi token trading with WLD pairs
-- **Portfolio Management**: Multi-wallet portfolio tracking
-- **Token Discovery**: Automatic new token detection
-- **High-Frequency Trading**: Professional trading operations
-- **Yield Farming**: Automated yield optimization
-- **Risk Management**: Stop loss and trailing stop protection
-- **DIP Trading**: Automated detection of buying opportunities
-
-## ⚠️ Disclaimers
-
-- **Educational Purpose**: This bot is for educational and research purposes
-- **Risk Warning**: Trading cryptocurrencies involves risk
-- **Private Keys**: Keep your private keys secure and never share them
-- **Testing**: Test with small amounts before large trades
-- **No Guarantees**: No guarantee of profits or performance
-
-## 🐛 Troubleshooting
+## 🆘 Troubleshooting
 
 ### Common Issues
 
-1. **Network Connection**
-   - Check internet connection
-   - Verify RPC endpoint accessibility
+**Low ML Accuracy**
+- Solution: Let it learn longer (48+ hours)
+- Check: Price database is running and collecting data
 
-2. **Gas Errors**
-   - Increase gas price in configuration
-   - Check wallet ETH balance for gas fees
+**No Auto-Trades Executing**
+- Check: Confidence threshold not too high (try 70%)
+- Verify: Auto-trading mode is enabled
+- Confirm: Sufficient WLD balance in wallet
 
-3. **Token Not Found**
-   - Verify contract address
-   - Check if token exists on Worldchain
+**"Cannot find module" Errors**
+```bash
+npm install
+./install-holdstation-sdk.sh
+```
 
-4. **Transaction Failed**
-   - Check wallet balance
-   - Verify trading pair liquidity
+**HoldStation SDK Issues**
+```bash
+npm install @holdstation/worldchain-sdk@latest
+npm install @holdstation/worldchain-ethers-v6@latest
+```
 
-## 🔄 Updates and Maintenance
+### Performance Optimization
+- **VPS Hosting**: Better connectivity and uptime
+- **4GB+ RAM**: Recommended for ML processing
+- **SSD Storage**: Faster data access for AI models
 
-The bot automatically:
-- Saves configuration changes
-- Updates wallet balances
-- Discovers new tokens
-- Maintains transaction history
+## 🤝 Contributing
+
+### Development Setup
+```bash
+git clone https://github.com/your-username/worldchain-algoritmit-bot.git
+cd worldchain-algoritmit-bot
+npm install
+npm run dev
+```
+
+### Areas for Contribution
+- **ML Model Improvements**: Better prediction algorithms
+- **UI/UX Enhancements**: Improved user interface
+- **Strategy Templates**: Pre-built trading strategies
+- **Documentation**: Guides and tutorials
+- **Testing**: Bug reports and fixes
+
+## 📈 Roadmap
+
+### Planned Features
+- **Deep Learning Models**: Neural networks for complex patterns
+- **Sentiment Analysis**: Social media and news integration
+- **Multi-Timeframe Analysis**: Different prediction horizons
+- **Portfolio Optimization**: Advanced risk management
+- **Strategy Sharing**: Community strategy marketplace
+
+### Community Features
+- **Performance Leaderboards**: Compare AI performance
+- **Strategy Templates**: Share successful configurations
+- **Collaborative Learning**: Crowd-sourced pattern recognition
 
 ## 📞 Support
 
-For issues or questions:
-1. Check the troubleshooting section
-2. Verify your configuration
-3. Test with small amounts first
-4. Review error messages carefully
+### Getting Help
+1. **Documentation**: Check guides and tutorials first
+2. **GitHub Issues**: Report bugs or request features
+3. **Discussions**: Community support and tips
+4. **In-App Help**: Built-in tutorials and guides
 
-## 🎯 Strategy System Usage
-
-### Basic Strategy Workflow:
-
-1. **Setup**: Create wallets and discover/add tokens
-2. **Configure**: Set profit targets, stop losses, and risk parameters
-3. **Start Strategy**: Enable automated monitoring system
-4. **Execute Trades**: Open strategic positions that will be tracked
-5. **Monitor**: Watch real-time P&L and automatic trade execution
-
-### Strategy Features:
-
-#### 📊 **Position Tracking**
-- Records entry price when you swap WLD → Token
-- Continuously monitors current price via swap quotes
-- Calculates real-time P&L percentage
-- Tracks position duration and performance
-
-#### 🎯 **Automatic Profit Taking**
-- Set profit target (e.g., 1% gain)
-- Bot automatically sells Token → WLD when target is reached
-- Example: Buy 1 WLD → 325,613 ORO, sell when 1% profit achieved
-
-#### 📉 **DIP Buying**
-- Monitors price movements for buying opportunities
-- Alerts when token price drops by configured percentage
-- Example: If 1 WLD normally gets 325 ORO, alert when it gets 328+ ORO (1% dip)
-
-#### 🛑 **Risk Management**
-- Stop loss protection (e.g., -5% maximum loss)
-- Trailing stops for profitable positions
-- Maximum position size limits
-- Slippage protection (rejects trades >1% slippage)
-
-#### ⚡ **Real-time Monitoring**
-- Price checks every 5 seconds (configurable)
-- Uses actual swap quotes for price discovery
-- Automatic trade execution when conditions are met
-- Live P&L updates and notifications
-
-### Configuration Options:
-
-```bash
-# Strategy settings in .env file
-PROFIT_TARGET=1.0          # 1% profit target
-DIP_BUY_THRESHOLD=1.0      # Buy on 1% dip
-MAX_SLIPPAGE=1.0           # Max 1% slippage
-STOP_LOSS_THRESHOLD=-5.0   # 5% stop loss
-PRICE_CHECK_INTERVAL=5000  # 5 second monitoring
-```
-
-## 🎉 Getting Started
-
-1. **Install** the dependencies: `./start.sh install`
-2. **Configure** your strategy settings in `.env`
-3. **Run** the bot: `./start.sh start`
-4. **Create** your first wallet
-5. **Add** tokens or let auto-discovery find them
-6. **Start** the strategy system
-7. **Execute** strategic trades with automatic monitoring!
-
-### Example Trading Flow:
-
-1. **Open Position**: Trade 10 WLD → 3,256 ORO at 0.00307 WLD/ORO
-2. **Monitor**: Bot checks price every 5 seconds
-3. **Profit Target**: When 1 ORO = 0.00310 WLD (1% gain), auto-sell
-4. **Result**: Sell 3,256 ORO → 10.1 WLD (0.1 WLD profit)
+### Safety Reminders
+- **Start with Learning Mode** for 24+ hours minimum
+- **Use tiny amounts** (0.01 WLD) when first testing auto-trading
+- **Monitor closely** during the first week of operation
+- **Never invest** more than you can afford to lose completely
 
 ---
 
-**Happy Strategic Trading on Worldchain! 🌍💰🎯**
+## 🚀 Quick Start Checklist
+
+- [ ] Install ALGORITMIT bot using one-line installer
+- [ ] Configure `.env` file with your wallet and RPC settings
+- [ ] Launch bot and go to ALGORITMIT menu (option 7)
+- [ ] Enable ALGORITMIT strategy
+- [ ] Turn on Learning Mode and let it run 24+ hours
+- [ ] Monitor ML accuracy until it reaches 60%+
+- [ ] Enable auto-trading with 0.01 WLD max position
+- [ ] Set confidence threshold to 75%
+- [ ] Monitor performance daily for first week
+- [ ] Scale up gradually based on results
+
+**Ready to start your AI trading journey? Install now and let machine learning optimize your Worldchain trading!**
+
+---
+
+*⚠️ Trading cryptocurrency involves substantial risk of loss. This software is provided "as is" without warranties. Always trade responsibly and never risk more than you can afford to lose.*
