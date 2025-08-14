@@ -48,7 +48,7 @@ class WorldchainTradingBot {
         this.tradingEngine = new AdvancedTradingEngine(this.provider, this.config);
         this.sinclaveEngine = new SinclaveEnhancedTradingEngine(this.provider, this.config);
         this.tokenDiscovery = new TokenDiscoveryService(this.provider, this.config);
-        this.strategyBuilder = new StrategyBuilder(this.tradingEngine, this.sinclaveEngine, this.config);
+        this.strategyBuilder = new StrategyBuilder(this.tradingEngine, this.sinclaveEngine, this.config, this.telegramNotifications);
         
         // Initialize Price Database
         this.priceDatabase = new PriceDatabase(this.sinclaveEngine, this.config);

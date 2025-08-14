@@ -4,11 +4,12 @@ const fs = require('fs');
 const path = require('path');
 
 class StrategyBuilder extends EventEmitter {
-    constructor(tradingEngine, sinclaveEngine, config) {
+    constructor(tradingEngine, sinclaveEngine, config, telegramNotifications = null) {
         super();
         this.tradingEngine = tradingEngine;
         this.sinclaveEngine = sinclaveEngine;
         this.config = config;
+        this.telegramNotifications = telegramNotifications;
         
         // Strategy storage
         this.customStrategies = new Map(); // strategyId -> strategy config
@@ -939,20 +940,44 @@ class StrategyBuilder extends EventEmitter {
                     // Execute the highest applicable step
                     const stepToExecute = applicableSteps.sort((a, b) => b.triggerPrice - a.triggerPrice)[0];
                     
-                    console.log(`📊 Executing Profit Range Step ${stepToExecute.stepNumber}:`);
+                    console.log(`🚀 AUTO-SELLING - Executing Profit Range Step ${stepToExecute.stepNumber}:`);
                     console.log(`   📈 Trigger: ${stepToExecute.profitPercent}% (${stepToExecute.triggerPrice.toFixed(8)} WLD)`);
                     console.log(`   💰 Sell Amount: ${stepToExecute.sellPercentage}% of remaining positions`);
                     console.log(`   🎯 Expected: ${stepToExecute.expectedTokens.toFixed(6)} tokens`);
                     
                     await this.executeProfitRangeStep(strategy, stepToExecute, currentPrice);
                 } else {
-                    // Show range progress
-                    const rangeProgress = Math.min(100, ((currentPrice - minPrice) / (maxPrice - minPrice)) * 100);
-                    console.log(`   📊 Range Progress: ${rangeProgress.toFixed(1)}% through profit range`);
-                    
-                    const nextStep = rangeState.sellSteps.find(step => !step.executed);
-                    if (nextStep) {
-                        console.log(`   ⏳ Next Sell: ${nextStep.profitPercent}% at ${nextStep.triggerPrice.toFixed(8)} WLD`);
+                    // Check if we're above the profit range and should sell everything
+                    if (unrealizedPnLPercent > strategy.profitRangeMax) {
+                        if (unrealizedPnLPercent > strategy.profitRangeMax * 1.5) {
+                            // Emergency sell for very high profits
+                            console.log(`🚨 PROFIT EXCEEDS 1.5x TARGET! Auto-selling remaining positions...`);
+                            console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (Target: ${strategy.profitRangeMax}%)`);
+                            console.log(`   🚀 EMERGENCY AUTO-SELL TRIGGERED!`);
+                            
+                            // Execute emergency profit taking
+                            await this.executeEmergencyProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent);
+                        } else {
+                            // Regular sell for profits above range
+                            console.log(`🎯 PROFIT ABOVE TARGET RANGE! Auto-selling all positions...`);
+                            console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (Target Range: ${strategy.profitRangeMin}%-${strategy.profitRangeMax}%)`);
+                            console.log(`   🚀 AUTO-SELL ACTIVATED!`);
+                            
+                            // Execute complete profit taking
+                            await this.executeEmergencyProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent);
+                        }
+                    } else {
+                        // Show range progress
+                        const rangeProgress = Math.min(100, ((currentPrice - minPrice) / (maxPrice - minPrice)) * 100);
+                        console.log(`   📊 Range Progress: ${rangeProgress.toFixed(1)}% through profit range`);
+                        
+                        const nextStep = rangeState.sellSteps.find(step => !step.executed);
+                        if (nextStep) {
+                            console.log(`   ⏳ Next Sell: ${nextStep.profitPercent}% at ${nextStep.triggerPrice.toFixed(8)} WLD`);
+                        } else {
+                            // All steps executed but still in profit - suggest manual action
+                            console.log(`   🎯 All profit steps completed. Consider manual sell at ${unrealizedPnLPercent.toFixed(2)}% profit!`);
+                        }
                     }
                 }
             } else {
@@ -1063,6 +1088,20 @@ class StrategyBuilder extends EventEmitter {
                 console.log(`   💰 Received: ${step.actualWLDReceived.toFixed(6)} WLD`);
                 console.log(`   📊 Remaining Positions: ${openPositions.filter(p => p.status === 'open').length}`);
                 
+                // Send Telegram notification if available
+                if (this.telegramNotifications) {
+                    await this.telegramNotifications.notifyTradeExecution({
+                        type: 'sell',
+                        tokenSymbol: strategy.targetTokenSymbol || strategy.name,
+                        amount: step.actualTokensSold.toFixed(6),
+                        outputAmount: step.actualWLDReceived.toFixed(6),
+                        price: currentPrice.toFixed(8),
+                        reason: `Profit Range Step ${step.stepNumber} (${step.profitPercent.toFixed(1)}% profit)`,
+                        profit: (step.actualWLDReceived - (tokensToSell / currentPrice)).toFixed(4),
+                        profitPercent: step.profitPercent.toFixed(1)
+                    });
+                }
+                
                 this.saveStrategies();
                 
             } else {
@@ -1071,6 +1110,95 @@ class StrategyBuilder extends EventEmitter {
             
         } catch (error) {
             console.error(`❌ Error executing profit range step:`, error.message);
+        }
+    }
+    
+    // Execute emergency profit sell when profit exceeds 2x target
+    async executeEmergencyProfitSell(strategy, openPositions, currentPrice, profitPercent) {
+        try {
+            console.log(`🚨 EMERGENCY PROFIT TAKING ACTIVATED!`);
+            console.log(`   📊 Profit: ${profitPercent.toFixed(2)}% (Target was: ${strategy.profitRangeMax}%)`);
+            
+            const totalTokens = openPositions.reduce((sum, pos) => sum + pos.entryAmountToken, 0);
+            const totalInvested = openPositions.reduce((sum, pos) => sum + pos.entryAmountWLD, 0);
+            
+            console.log(`   💰 Selling ALL remaining: ${totalTokens.toFixed(6)} tokens`);
+            console.log(`   📊 Original Investment: ${totalInvested.toFixed(6)} WLD`);
+            
+            // Execute complete sell
+            const sellResult = await this.sinclaveEngine.executeOptimizedSwap(
+                strategy.walletObject,
+                strategy.targetToken,
+                this.WLD_ADDRESS,
+                totalTokens,
+                strategy.maxSlippage
+            );
+            
+            if (sellResult.success) {
+                const wldReceived = parseFloat(sellResult.amountOut);
+                const realizedProfit = wldReceived - totalInvested;
+                const realizedProfitPercent = (realizedProfit / totalInvested) * 100;
+                
+                // Close all positions
+                openPositions.forEach(pos => {
+                    pos.status = 'closed';
+                    pos.exitPrice = currentPrice;
+                    pos.exitTimestamp = Date.now();
+                    pos.exitReason = 'emergency_profit_taking';
+                    pos.realizedPnL = (pos.entryAmountToken * currentPrice) - pos.entryAmountWLD;
+                    pos.realizedPnLPercent = (pos.realizedPnL / pos.entryAmountWLD) * 100;
+                });
+                
+                // Update strategy stats
+                strategy.totalTrades++;
+                strategy.successfulTrades++;
+                strategy.totalProfit += realizedProfit;
+                strategy.lastTradeTimestamp = Date.now();
+                
+                console.log(`🎉 EMERGENCY PROFIT TAKING SUCCESSFUL!`);
+                console.log(`   💰 Sold: ${totalTokens.toFixed(6)} tokens`);
+                console.log(`   💰 Received: ${wldReceived.toFixed(6)} WLD`);
+                console.log(`   🎯 Realized Profit: ${realizedProfit.toFixed(6)} WLD (${realizedProfitPercent.toFixed(2)}%)`);
+                console.log(`   📊 All positions closed`);
+                
+                // Send Telegram notification
+                if (this.telegramNotifications) {
+                    await this.telegramNotifications.notifyTradeExecution({
+                        type: 'sell',
+                        tokenSymbol: strategy.targetTokenSymbol || strategy.name,
+                        amount: totalTokens.toFixed(6),
+                        outputAmount: wldReceived.toFixed(6),
+                        price: currentPrice.toFixed(8),
+                        reason: `Emergency Profit Taking (${profitPercent.toFixed(1)}% profit)`,
+                        profit: realizedProfit.toFixed(4),
+                        profitPercent: realizedProfitPercent.toFixed(1)
+                    });
+                    
+                    await this.telegramNotifications.notifyProfitAlert({
+                        tokenSymbol: strategy.targetTokenSymbol || strategy.name,
+                        entryPrice: totalInvested / totalTokens,
+                        currentPrice: currentPrice,
+                        amount: totalTokens,
+                        currentValue: wldReceived,
+                        unrealizedPnL: realizedProfit,
+                        strategy: `${strategy.name} (Emergency Exit)`
+                    }, realizedProfitPercent);
+                }
+                
+                this.saveStrategies();
+                
+                // Mark strategy as completed
+                strategy.status = 'completed';
+                strategy.completionReason = 'emergency_profit_taking';
+                strategy.finalProfit = realizedProfit;
+                strategy.finalProfitPercent = realizedProfitPercent;
+                
+            } else {
+                console.log(`❌ Emergency Profit Taking Failed: ${sellResult.error}`);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error in emergency profit taking:`, error.message);
         }
     }
     
