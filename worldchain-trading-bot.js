@@ -2195,7 +2195,7 @@ class WorldchainTradingBot {
             console.log('7. 🔙 Back to Main Menu');
             console.log('────────────────────────────────────────────────────────────');
 
-            const choice = await this.getInput('Select option: ');
+            const choice = await this.getUserInput('Select option: ');
 
             switch (choice) {
                 case '1':
@@ -2220,7 +2220,7 @@ class WorldchainTradingBot {
                     return;
                 default:
                     console.log('❌ Invalid option. Please try again.');
-                    await this.getInput('Press Enter to continue...');
+                    await this.getUserInput('Press Enter to continue...');
             }
         }
     }
@@ -2251,7 +2251,7 @@ class WorldchainTradingBot {
             });
         }
 
-        await this.getInput('\nPress Enter to continue...');
+        await this.getUserInput('\nPress Enter to continue...');
     }
 
     // Create new custom strategy
@@ -2269,10 +2269,10 @@ class WorldchainTradingBot {
 
         try {
             // Get strategy configuration
-            const name = await this.getInput('Strategy Name: ');
+            const name = await this.getUserInput('Strategy Name: ');
             if (!name.trim()) {
                 console.log('❌ Strategy name cannot be empty.');
-                await this.getInput('Press Enter to continue...');
+                await this.getUserInput('Press Enter to continue...');
                 return;
             }
 
@@ -2282,7 +2282,7 @@ class WorldchainTradingBot {
             
             if (tokens.length === 0) {
                 console.log('❌ No tokens discovered. Please run Token Discovery first.');
-                await this.getInput('Press Enter to continue...');
+                await this.getUserInput('Press Enter to continue...');
                 return;
             }
 
@@ -2290,39 +2290,39 @@ class WorldchainTradingBot {
                 console.log(`${index + 1}. ${token.symbol || 'Unknown'} (${address})`);
             });
 
-            const tokenChoice = await this.getInput('\nSelect target token (number): ');
+            const tokenChoice = await this.getUserInput('\nSelect target token (number): ');
             const tokenIndex = parseInt(tokenChoice) - 1;
             
             if (tokenIndex < 0 || tokenIndex >= tokens.length) {
                 console.log('❌ Invalid token selection.');
-                await this.getInput('Press Enter to continue...');
+                await this.getUserInput('Press Enter to continue...');
                 return;
             }
 
             const [targetToken, tokenInfo] = tokens[tokenIndex];
 
             // Get strategy parameters
-            const dipThreshold = parseFloat(await this.getInput('DIP Threshold % (e.g., 5 for 5% drop): '));
-            const profitTarget = parseFloat(await this.getInput('Profit Target % (e.g., 3 for 3% profit): '));
-            const tradeAmount = parseFloat(await this.getInput('Trade Amount in WLD (e.g., 0.1): '));
-            const maxSlippage = parseFloat(await this.getInput('Max Slippage % (e.g., 1 for 1%): ') || '1');
+            const dipThreshold = parseFloat(await this.getUserInput('DIP Threshold % (e.g., 5 for 5% drop): '));
+            const profitTarget = parseFloat(await this.getUserInput('Profit Target % (e.g., 3 for 3% profit): '));
+            const tradeAmount = parseFloat(await this.getUserInput('Trade Amount in WLD (e.g., 0.1): '));
+            const maxSlippage = parseFloat(await this.getUserInput('Max Slippage % (e.g., 1 for 1%): ') || '1');
 
             // Validation
             if (isNaN(dipThreshold) || dipThreshold <= 0 || dipThreshold > 50) {
                 console.log('❌ Invalid DIP threshold. Must be between 0.1% and 50%.');
-                await this.getInput('Press Enter to continue...');
+                await this.getUserInput('Press Enter to continue...');
                 return;
             }
 
             if (isNaN(profitTarget) || profitTarget <= 0 || profitTarget > 100) {
                 console.log('❌ Invalid profit target. Must be between 0.1% and 100%.');
-                await this.getInput('Press Enter to continue...');
+                await this.getUserInput('Press Enter to continue...');
                 return;
             }
 
             if (isNaN(tradeAmount) || tradeAmount <= 0) {
                 console.log('❌ Invalid trade amount. Must be greater than 0.');
-                await this.getInput('Press Enter to continue...');
+                await this.getUserInput('Press Enter to continue...');
                 return;
             }
 
@@ -2359,7 +2359,7 @@ class WorldchainTradingBot {
             console.log(`❌ Error creating strategy: ${error.message}`);
         }
 
-        await this.getInput('\nPress Enter to continue...');
+        await this.getUserInput('\nPress Enter to continue...');
     }
 
     // Start custom strategy
@@ -2372,7 +2372,7 @@ class WorldchainTradingBot {
         
         if (strategies.length === 0) {
             console.log('📭 No custom strategies found. Create one first!');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
@@ -2387,12 +2387,12 @@ class WorldchainTradingBot {
             console.log(`   📋 ID: ${strategy.id}`);
         });
 
-        const choice = await this.getInput('\nSelect strategy to start (number): ');
+        const choice = await this.getUserInput('\nSelect strategy to start (number): ');
         const strategyIndex = parseInt(choice) - 1;
         
         if (strategyIndex < 0 || strategyIndex >= strategies.length) {
             console.log('❌ Invalid strategy selection.');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
@@ -2400,14 +2400,14 @@ class WorldchainTradingBot {
 
         if (this.strategyBuilder.isStrategyActive(strategy.id)) {
             console.log('⚠️ Strategy is already running!');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
         // Select wallet for strategy
         if (this.wallets.length === 0) {
             console.log('❌ No wallets available. Add a wallet first!');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
@@ -2416,12 +2416,12 @@ class WorldchainTradingBot {
             console.log(`${index + 1}. ${wallet.name} (${wallet.address})`);
         });
 
-        const walletChoice = await this.getInput('Select wallet (number): ');
+        const walletChoice = await this.getUserInput('Select wallet (number): ');
         const walletIndex = parseInt(walletChoice) - 1;
         
         if (walletIndex < 0 || walletIndex >= this.wallets.length) {
             console.log('❌ Invalid wallet selection.');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
@@ -2441,7 +2441,7 @@ class WorldchainTradingBot {
             console.log(`❌ Error starting strategy: ${error.message}`);
         }
 
-        await this.getInput('\nPress Enter to continue...');
+        await this.getUserInput('\nPress Enter to continue...');
     }
 
     // Stop custom strategy
@@ -2456,7 +2456,7 @@ class WorldchainTradingBot {
         
         if (activeStrategies.length === 0) {
             console.log('📭 No active strategies found.');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
@@ -2468,12 +2468,12 @@ class WorldchainTradingBot {
             console.log(`   📋 ID: ${strategy.id}`);
         });
 
-        const choice = await this.getInput('\nSelect strategy to stop (number): ');
+        const choice = await this.getUserInput('\nSelect strategy to stop (number): ');
         const strategyIndex = parseInt(choice) - 1;
         
         if (strategyIndex < 0 || strategyIndex >= activeStrategies.length) {
             console.log('❌ Invalid strategy selection.');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
@@ -2486,7 +2486,7 @@ class WorldchainTradingBot {
             console.log(`❌ Error stopping strategy: ${error.message}`);
         }
 
-        await this.getInput('\nPress Enter to continue...');
+        await this.getUserInput('\nPress Enter to continue...');
     }
 
     // Delete custom strategy
@@ -2499,7 +2499,7 @@ class WorldchainTradingBot {
         
         if (strategies.length === 0) {
             console.log('📭 No custom strategies found.');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
@@ -2514,23 +2514,23 @@ class WorldchainTradingBot {
             console.log(`   📋 ID: ${strategy.id}`);
         });
 
-        const choice = await this.getInput('\nSelect strategy to delete (number): ');
+        const choice = await this.getUserInput('\nSelect strategy to delete (number): ');
         const strategyIndex = parseInt(choice) - 1;
         
         if (strategyIndex < 0 || strategyIndex >= strategies.length) {
             console.log('❌ Invalid strategy selection.');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
         const strategy = strategies[strategyIndex];
 
         // Confirm deletion
-        const confirm = await this.getInput(`⚠️ Are you sure you want to delete "${strategy.name}"? (yes/no): `);
+        const confirm = await this.getUserInput(`⚠️ Are you sure you want to delete "${strategy.name}"? (yes/no): `);
         
         if (confirm.toLowerCase() !== 'yes') {
             console.log('❌ Deletion cancelled.');
-            await this.getInput('Press Enter to continue...');
+            await this.getUserInput('Press Enter to continue...');
             return;
         }
 
@@ -2546,7 +2546,7 @@ class WorldchainTradingBot {
             console.log(`❌ Error deleting strategy: ${error.message}`);
         }
 
-        await this.getInput('\nPress Enter to continue...');
+        await this.getUserInput('\nPress Enter to continue...');
     }
 
     // View strategy statistics
@@ -2577,7 +2577,7 @@ class WorldchainTradingBot {
             console.log(`❌ Error loading statistics: ${error.message}`);
         }
 
-        await this.getInput('\nPress Enter to continue...');
+        await this.getUserInput('\nPress Enter to continue...');
     }
 }
 
