@@ -21,15 +21,15 @@ class NoviceFullTradingBot {
         
         // Color codes for beautiful output
         this.colors = {
-            reset: '\033[0m',
-            bright: '\033[1m',
-            red: '\033[31m',
-            green: '\033[32m',
-            yellow: '\033[33m',
-            blue: '\033[34m',
-            magenta: '\033[35m',
-            cyan: '\033[36m',
-            white: '\033[37m'
+            reset: '\x1b[0m',
+            bright: '\x1b[1m',
+            red: '\x1b[31m',
+            green: '\x1b[32m',
+            yellow: '\x1b[33m',
+            blue: '\x1b[34m',
+            magenta: '\x1b[35m',
+            cyan: '\x1b[36m',
+            white: '\x1b[37m'
         };
     }
 
