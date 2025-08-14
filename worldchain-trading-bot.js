@@ -69,6 +69,9 @@ class WorldchainTradingBot {
         // Initialize Telegram notifications
         this.telegramNotifications = new TelegramNotifications(this.config);
         
+        // Initialize price triggers
+        this.triggers = [];
+        
         // Auto-track discovered tokens
         this.setupPriceDatabaseIntegration();
         
@@ -4797,6 +4800,525 @@ class WorldchainTradingBot {
         }
         
         await this.getUserInput('Press Enter to continue...');
+    }
+
+    // Price Trigger Methods
+    async createBuyTrigger() {
+        console.clear();
+        console.log(chalk.cyan('🎯 CREATE BUY TRIGGER'));
+        console.log(chalk.gray('═'.repeat(40)));
+        
+        try {
+            // Get discovered tokens for selection
+            const discoveredTokens = this.tokenDiscovery.getDiscoveredTokens();
+            const popularTokens = ['ORO', 'YIELD', 'Ramen'];
+            const allTokens = [...new Set([...popularTokens, ...Object.keys(discoveredTokens)])];
+            
+            if (allTokens.length === 0) {
+                console.log(chalk.red('❌ No tokens available. Please discover tokens first.'));
+                await this.getUserInput('Press Enter to continue...');
+                return;
+            }
+            
+            console.log(chalk.white('\n🪙 Available Tokens:'));
+            allTokens.forEach((token, index) => {
+                const address = discoveredTokens[token] || 'Popular token';
+                console.log(chalk.white(`${index + 1}. ${token} (${typeof address === 'string' ? address.slice(0, 10) + '...' : address})`));
+            });
+            
+            const tokenChoice = await this.getUserInput('\nSelect token (number): ');
+            const tokenIndex = parseInt(tokenChoice) - 1;
+            
+            if (tokenIndex < 0 || tokenIndex >= allTokens.length) {
+                console.log(chalk.red('❌ Invalid token selection'));
+                await this.getUserInput('Press Enter to continue...');
+                return;
+            }
+            
+            const selectedToken = allTokens[tokenIndex];
+            const tokenAddress = discoveredTokens[selectedToken] || await this.getTokenAddress(selectedToken);
+            
+            if (!tokenAddress) {
+                console.log(chalk.red('❌ Could not find token address'));
+                await this.getUserInput('Press Enter to continue...');
+                return;
+            }
+            
+            // Get trigger configuration
+            console.log(chalk.white(`\n🎯 Setting up BUY trigger for ${selectedToken}`));
+            
+            const triggerType = await this.getUserInput('Trigger type (1=Price Below, 2=Price Above, 3=% Drop): ');
+            let condition, targetPrice, description;
+            
+            switch (triggerType) {
+                case '1':
+                    targetPrice = await this.getUserInput('Target price (WLD per token): ');
+                    condition = 'below';
+                    description = `Buy ${selectedToken} when price drops below ${targetPrice} WLD`;
+                    break;
+                case '2':
+                    targetPrice = await this.getUserInput('Target price (WLD per token): ');
+                    condition = 'above';
+                    description = `Buy ${selectedToken} when price rises above ${targetPrice} WLD`;
+                    break;
+                case '3':
+                    const dropPercent = await this.getUserInput('Drop percentage (e.g., 10 for 10%): ');
+                    condition = 'drop';
+                    targetPrice = dropPercent;
+                    description = `Buy ${selectedToken} on ${dropPercent}% price drop`;
+                    break;
+                default:
+                    console.log(chalk.red('❌ Invalid trigger type'));
+                    await this.getUserInput('Press Enter to continue...');
+                    return;
+            }
+            
+            const amount = await this.getUserInput('Amount to spend (WLD): ');
+            const walletIndex = await this.getUserInput('Wallet to use (1 for first wallet): ');
+            
+            if (!amount || isNaN(parseFloat(amount))) {
+                console.log(chalk.red('❌ Invalid amount'));
+                await this.getUserInput('Press Enter to continue...');
+                return;
+            }
+            
+            // Create the trigger
+            const trigger = {
+                id: `buy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: 'buy',
+                tokenSymbol: selectedToken,
+                tokenAddress: tokenAddress,
+                condition: condition,
+                targetPrice: parseFloat(targetPrice),
+                amount: parseFloat(amount),
+                walletIndex: parseInt(walletIndex) - 1 || 0,
+                description: description,
+                active: true,
+                created: Date.now(),
+                executed: false
+            };
+            
+            // Store trigger (assuming we have a triggers storage)
+            if (!this.triggers) this.triggers = [];
+            this.triggers.push(trigger);
+            
+            // Start monitoring this token if not already
+            this.priceDatabase.addToken(tokenAddress, selectedToken);
+            
+            console.log(chalk.green('\n✅ Buy trigger created successfully!'));
+            console.log(chalk.white(`🎯 ${description}`));
+            console.log(chalk.white(`💰 Amount: ${amount} WLD`));
+            console.log(chalk.white(`🆔 Trigger ID: ${trigger.id}`));
+            
+            // Send Telegram notification if configured
+            if (this.telegramNotifications) {
+                await this.telegramNotifications.sendCustomMessage(
+                    `🎯 <b>BUY TRIGGER CREATED</b>\n\n` +
+                    `🪙 Token: ${selectedToken}\n` +
+                    `📊 ${description}\n` +
+                    `💰 Amount: ${amount} WLD\n` +
+                    `🆔 ID: ${trigger.id}\n\n` +
+                    `🕐 ${new Date().toLocaleString()}`
+                );
+            }
+            
+        } catch (error) {
+            console.log(chalk.red(`❌ Error creating buy trigger: ${error.message}`));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    async createSellTrigger() {
+        console.clear();
+        console.log(chalk.cyan('🎯 CREATE SELL TRIGGER'));
+        console.log(chalk.gray('═'.repeat(40)));
+        
+        try {
+            // Get current positions for sell triggers
+            const positions = this.tradingStrategy.getAllPositions();
+            
+            if (positions.length === 0) {
+                console.log(chalk.red('❌ No open positions available for sell triggers.'));
+                console.log(chalk.white('💡 You need open positions to create sell triggers.'));
+                await this.getUserInput('Press Enter to continue...');
+                return;
+            }
+            
+            console.log(chalk.white('\n📊 Open Positions:'));
+            positions.forEach((position, index) => {
+                const profitPercent = ((position.currentPrice - position.entryPrice) / position.entryPrice) * 100;
+                const profitColor = profitPercent >= 0 ? chalk.green : chalk.red;
+                console.log(chalk.white(`${index + 1}. ${position.tokenAddress.slice(0, 8)}... `));
+                console.log(chalk.white(`   Entry: ${position.entryPrice?.toFixed(8)} WLD | Current: ${position.currentPrice?.toFixed(8)} WLD`));
+                console.log(profitColor(`   P&L: ${profitPercent.toFixed(2)}% | Amount: ${position.amount?.toFixed(6)} tokens`));
+            });
+            
+            const positionChoice = await this.getUserInput('\nSelect position (number): ');
+            const positionIndex = parseInt(positionChoice) - 1;
+            
+            if (positionIndex < 0 || positionIndex >= positions.length) {
+                console.log(chalk.red('❌ Invalid position selection'));
+                await this.getUserInput('Press Enter to continue...');
+                return;
+            }
+            
+            const selectedPosition = positions[positionIndex];
+            
+            // Get trigger configuration
+            console.log(chalk.white(`\n🎯 Setting up SELL trigger for position`));
+            console.log(chalk.white(`Token: ${selectedPosition.tokenAddress.slice(0, 10)}...`));
+            
+            const triggerType = await this.getUserInput('Trigger type (1=Price Above, 2=Price Below, 3=% Profit, 4=% Loss): ');
+            let condition, targetPrice, description;
+            
+            switch (triggerType) {
+                case '1':
+                    targetPrice = await this.getUserInput('Target price (WLD per token): ');
+                    condition = 'above';
+                    description = `Sell when price rises above ${targetPrice} WLD`;
+                    break;
+                case '2':
+                    targetPrice = await this.getUserInput('Target price (WLD per token): ');
+                    condition = 'below';
+                    description = `Sell when price drops below ${targetPrice} WLD`;
+                    break;
+                case '3':
+                    const profitPercent = await this.getUserInput('Profit percentage (e.g., 15 for 15%): ');
+                    condition = 'profit';
+                    targetPrice = profitPercent;
+                    description = `Sell at ${profitPercent}% profit`;
+                    break;
+                case '4':
+                    const lossPercent = await this.getUserInput('Loss percentage (e.g., 10 for 10%): ');
+                    condition = 'loss';
+                    targetPrice = lossPercent;
+                    description = `Sell at ${lossPercent}% loss (stop loss)`;
+                    break;
+                default:
+                    console.log(chalk.red('❌ Invalid trigger type'));
+                    await this.getUserInput('Press Enter to continue...');
+                    return;
+            }
+            
+            const sellAmount = await this.getUserInput(`Amount to sell (tokens, max: ${selectedPosition.amount?.toFixed(6)}): `);
+            
+            if (!sellAmount || isNaN(parseFloat(sellAmount))) {
+                console.log(chalk.red('❌ Invalid amount'));
+                await this.getUserInput('Press Enter to continue...');
+                return;
+            }
+            
+            // Create the trigger
+            const trigger = {
+                id: `sell_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: 'sell',
+                tokenSymbol: selectedPosition.tokenAddress.slice(0, 8) + '...',
+                tokenAddress: selectedPosition.tokenAddress,
+                positionId: selectedPosition.id,
+                condition: condition,
+                targetPrice: parseFloat(targetPrice),
+                amount: parseFloat(sellAmount),
+                description: description,
+                active: true,
+                created: Date.now(),
+                executed: false
+            };
+            
+            // Store trigger
+            if (!this.triggers) this.triggers = [];
+            this.triggers.push(trigger);
+            
+            console.log(chalk.green('\n✅ Sell trigger created successfully!'));
+            console.log(chalk.white(`🎯 ${description}`));
+            console.log(chalk.white(`💰 Amount: ${sellAmount} tokens`));
+            console.log(chalk.white(`🆔 Trigger ID: ${trigger.id}`));
+            
+            // Send Telegram notification if configured
+            if (this.telegramNotifications) {
+                await this.telegramNotifications.sendCustomMessage(
+                    `🎯 <b>SELL TRIGGER CREATED</b>\n\n` +
+                    `🪙 Token: ${trigger.tokenSymbol}\n` +
+                    `📊 ${description}\n` +
+                    `💰 Amount: ${sellAmount} tokens\n` +
+                    `🆔 ID: ${trigger.id}\n\n` +
+                    `🕐 ${new Date().toLocaleString()}`
+                );
+            }
+            
+        } catch (error) {
+            console.log(chalk.red(`❌ Error creating sell trigger: ${error.message}`));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    async viewActiveTriggers() {
+        console.clear();
+        console.log(chalk.cyan('🎯 ACTIVE TRIGGERS'));
+        console.log(chalk.gray('═'.repeat(40)));
+        
+        if (!this.triggers || this.triggers.length === 0) {
+            console.log(chalk.yellow('📭 No triggers created yet.'));
+            console.log(chalk.white('💡 Use "Create Buy Trigger" or "Create Sell Trigger" to get started.'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+        
+        const activeTriggers = this.triggers.filter(t => t.active && !t.executed);
+        const executedTriggers = this.triggers.filter(t => t.executed);
+        const inactiveTriggers = this.triggers.filter(t => !t.active && !t.executed);
+        
+        console.log(chalk.white(`\n📊 Trigger Summary:`));
+        console.log(chalk.green(`🟢 Active: ${activeTriggers.length}`));
+        console.log(chalk.blue(`✅ Executed: ${executedTriggers.length}`));
+        console.log(chalk.yellow(`⏸️  Inactive: ${inactiveTriggers.length}`));
+        console.log(chalk.white(`📈 Total: ${this.triggers.length}`));
+        
+        if (activeTriggers.length > 0) {
+            console.log(chalk.cyan('\n🟢 ACTIVE TRIGGERS:'));
+            activeTriggers.forEach((trigger, index) => {
+                const typeEmoji = trigger.type === 'buy' ? '🟢' : '🔴';
+                const ageHours = ((Date.now() - trigger.created) / (1000 * 60 * 60)).toFixed(1);
+                
+                console.log(chalk.white(`\n${index + 1}. ${typeEmoji} ${trigger.type.toUpperCase()} TRIGGER`));
+                console.log(chalk.white(`   🆔 ID: ${trigger.id}`));
+                console.log(chalk.white(`   🪙 Token: ${trigger.tokenSymbol}`));
+                console.log(chalk.white(`   📊 ${trigger.description}`));
+                console.log(chalk.white(`   💰 Amount: ${trigger.amount} ${trigger.type === 'buy' ? 'WLD' : 'tokens'}`));
+                console.log(chalk.gray(`   ⏰ Created: ${ageHours}h ago`));
+            });
+        }
+        
+        if (executedTriggers.length > 0) {
+            console.log(chalk.cyan('\n✅ RECENTLY EXECUTED:'));
+            executedTriggers.slice(-5).forEach((trigger, index) => {
+                const typeEmoji = trigger.type === 'buy' ? '🟢' : '🔴';
+                const ageHours = ((Date.now() - trigger.executed) / (1000 * 60 * 60)).toFixed(1);
+                
+                console.log(chalk.white(`\n${index + 1}. ${typeEmoji} ${trigger.type.toUpperCase()} EXECUTED`));
+                console.log(chalk.white(`   🆔 ID: ${trigger.id}`));
+                console.log(chalk.white(`   🪙 Token: ${trigger.tokenSymbol}`));
+                console.log(chalk.green(`   ✅ ${trigger.description}`));
+                console.log(chalk.gray(`   ⏰ Executed: ${ageHours}h ago`));
+            });
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    async viewPriceDatabaseStatus() {
+        console.clear();
+        console.log(chalk.cyan('📊 PRICE DATABASE STATUS'));
+        console.log(chalk.gray('═'.repeat(40)));
+        
+        const status = this.priceDatabase.getStatus();
+        const stats = this.priceDatabase.getStatistics();
+        
+        console.log(chalk.white('\n🔧 System Status:'));
+        console.log(chalk.white(`   Monitoring: ${status.isRunning ? '🟢 ACTIVE' : '🔴 STOPPED'}`));
+        console.log(chalk.white(`   Tracked Tokens: ${status.trackedTokens}`));
+        console.log(chalk.white(`   Active Triggers: ${status.activeTriggers}/${status.totalTriggers}`));
+        console.log(chalk.white(`   Price Points: ${status.totalPricePoints}`));
+        
+        if (stats) {
+            console.log(chalk.white('\n📈 Statistics:'));
+            console.log(chalk.white(`   Total Price Updates: ${stats.totalUpdates || 0}`));
+            console.log(chalk.white(`   Average Update Interval: ${stats.averageInterval || 'N/A'}ms`));
+            console.log(chalk.white(`   Last Update: ${stats.lastUpdate ? new Date(stats.lastUpdate).toLocaleString() : 'Never'}`));
+        }
+        
+        console.log(chalk.white('\n🪙 Tracked Tokens:'));
+        const trackedTokens = this.priceDatabase.getTrackedTokens();
+        if (trackedTokens && trackedTokens.length > 0) {
+            trackedTokens.forEach((token, index) => {
+                console.log(chalk.white(`   ${index + 1}. ${token.symbol || 'Unknown'} (${token.address.slice(0, 10)}...)`));
+                if (token.lastPrice) {
+                    console.log(chalk.gray(`      Last Price: ${token.lastPrice.toFixed(8)} WLD`));
+                    console.log(chalk.gray(`      Updated: ${new Date(token.lastUpdate).toLocaleString()}`));
+                }
+            });
+        } else {
+            console.log(chalk.gray('   No tokens being tracked'));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    async manageTriggers() {
+        console.clear();
+        console.log(chalk.cyan('🔧 MANAGE TRIGGERS'));
+        console.log(chalk.gray('═'.repeat(40)));
+        
+        if (!this.triggers || this.triggers.length === 0) {
+            console.log(chalk.yellow('📭 No triggers to manage.'));
+            await this.getUserInput('Press Enter to continue...');
+            return;
+        }
+        
+        console.log(chalk.white('\n📋 All Triggers:'));
+        this.triggers.forEach((trigger, index) => {
+            const statusEmoji = trigger.executed ? '✅' : (trigger.active ? '🟢' : '⏸️');
+            const typeEmoji = trigger.type === 'buy' ? '🟢' : '🔴';
+            
+            console.log(chalk.white(`${index + 1}. ${statusEmoji} ${typeEmoji} ${trigger.description}`));
+            console.log(chalk.gray(`   ID: ${trigger.id}`));
+        });
+        
+        const choice = await this.getUserInput('\nSelect trigger to manage (number) or 0 to cancel: ');
+        const triggerIndex = parseInt(choice) - 1;
+        
+        if (choice === '0') return;
+        
+        if (triggerIndex < 0 || triggerIndex >= this.triggers.length) {
+            console.log(chalk.red('❌ Invalid selection'));
+            await this.getUserInput('Press Enter to continue...');
+            return;
+        }
+        
+        const trigger = this.triggers[triggerIndex];
+        
+        console.log(chalk.white(`\n🔧 Managing trigger: ${trigger.description}`));
+        console.log(chalk.white('1. Toggle Active/Inactive'));
+        console.log(chalk.white('2. Delete Trigger'));
+        console.log(chalk.white('3. View Details'));
+        console.log(chalk.white('4. Back'));
+        
+        const action = await this.getUserInput('Select action: ');
+        
+        switch (action) {
+            case '1':
+                trigger.active = !trigger.active;
+                console.log(chalk.green(`✅ Trigger ${trigger.active ? 'activated' : 'deactivated'}`));
+                break;
+            case '2':
+                const confirm = await this.getUserInput('Confirm delete (y/N): ');
+                if (confirm.toLowerCase() === 'y') {
+                    this.triggers.splice(triggerIndex, 1);
+                    console.log(chalk.green('✅ Trigger deleted'));
+                }
+                break;
+            case '3':
+                console.log(chalk.white('\n📊 Trigger Details:'));
+                console.log(chalk.white(`   ID: ${trigger.id}`));
+                console.log(chalk.white(`   Type: ${trigger.type.toUpperCase()}`));
+                console.log(chalk.white(`   Token: ${trigger.tokenSymbol}`));
+                console.log(chalk.white(`   Condition: ${trigger.condition}`));
+                console.log(chalk.white(`   Target: ${trigger.targetPrice}`));
+                console.log(chalk.white(`   Amount: ${trigger.amount}`));
+                console.log(chalk.white(`   Status: ${trigger.executed ? 'Executed' : (trigger.active ? 'Active' : 'Inactive')}`));
+                console.log(chalk.white(`   Created: ${new Date(trigger.created).toLocaleString()}`));
+                break;
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    async quickTriggerCommands() {
+        console.clear();
+        console.log(chalk.cyan('⚡ QUICK TRIGGER COMMANDS'));
+        console.log(chalk.gray('═'.repeat(40)));
+        
+        console.log(chalk.white('\n💡 Quick Command Format:'));
+        console.log(chalk.white('   Buy triggers: buy [token] [amount] [condition] [value]'));
+        console.log(chalk.white('   Sell triggers: sell [token] [amount] [condition] [value]'));
+        
+        console.log(chalk.white('\n📝 Examples:'));
+        console.log(chalk.gray('   buy ORO 0.1 below 0.005     - Buy 0.1 WLD of ORO when price < 0.005'));
+        console.log(chalk.gray('   buy YIELD 0.2 drop 10       - Buy 0.2 WLD of YIELD on 10% drop'));
+        console.log(chalk.gray('   sell ORO 100 profit 15      - Sell 100 ORO tokens at 15% profit'));
+        console.log(chalk.gray('   sell YIELD 50 above 0.008   - Sell 50 YIELD when price > 0.008'));
+        
+        const command = await this.getUserInput('\nEnter quick command (or press Enter to cancel): ');
+        
+        if (!command.trim()) return;
+        
+        try {
+            await this.parseAndExecuteTriggerCommand(command);
+        } catch (error) {
+            console.log(chalk.red(`❌ Error: ${error.message}`));
+            console.log(chalk.yellow('💡 Check command format and try again'));
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    async parseAndExecuteTriggerCommand(command) {
+        const parts = command.trim().split(/\s+/);
+        
+        if (parts.length < 5) {
+            throw new Error('Invalid command format. Need: [buy/sell] [token] [amount] [condition] [value]');
+        }
+        
+        const [action, token, amount, condition, value] = parts;
+        
+        if (!['buy', 'sell'].includes(action.toLowerCase())) {
+            throw new Error('Action must be "buy" or "sell"');
+        }
+        
+        if (isNaN(parseFloat(amount))) {
+            throw new Error('Amount must be a number');
+        }
+        
+        if (isNaN(parseFloat(value))) {
+            throw new Error('Value must be a number');
+        }
+        
+        // Create trigger based on command
+        const trigger = {
+            id: `${action}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: action.toLowerCase(),
+            tokenSymbol: token.toUpperCase(),
+            tokenAddress: await this.getTokenAddress(token) || 'unknown',
+            condition: condition.toLowerCase(),
+            targetPrice: parseFloat(value),
+            amount: parseFloat(amount),
+            description: `${action.toUpperCase()} ${token} ${condition} ${value}`,
+            active: true,
+            created: Date.now(),
+            executed: false
+        };
+        
+        if (!this.triggers) this.triggers = [];
+        this.triggers.push(trigger);
+        
+        console.log(chalk.green(`✅ Quick trigger created: ${trigger.description}`));
+        console.log(chalk.white(`🆔 Trigger ID: ${trigger.id}`));
+    }
+
+    async viewPriceStatistics() {
+        console.clear();
+        console.log(chalk.cyan('📈 PRICE STATISTICS'));
+        console.log(chalk.gray('═'.repeat(40)));
+        
+        const stats = this.priceDatabase.getStatistics();
+        
+        if (!stats) {
+            console.log(chalk.yellow('📭 No price statistics available.'));
+            console.log(chalk.white('💡 Price monitoring needs to run for a while to gather statistics.'));
+            await this.getUserInput('Press Enter to continue...');
+            return;
+        }
+        
+        console.log(chalk.white('\n📊 Overall Statistics:'));
+        console.log(chalk.white(`   Total Price Updates: ${stats.totalUpdates || 0}`));
+        console.log(chalk.white(`   Average Update Time: ${stats.averageInterval || 'N/A'}ms`));
+        console.log(chalk.white(`   Last Update: ${stats.lastUpdate ? new Date(stats.lastUpdate).toLocaleString() : 'Never'}`));
+        console.log(chalk.white(`   Uptime: ${stats.uptime || 'N/A'}`));
+        
+        if (stats.tokens) {
+            console.log(chalk.white('\n🪙 Token Statistics:'));
+            Object.entries(stats.tokens).forEach(([symbol, tokenStats]) => {
+                console.log(chalk.white(`\n   ${symbol}:`));
+                console.log(chalk.white(`     Current Price: ${tokenStats.currentPrice?.toFixed(8) || 'N/A'} WLD`));
+                console.log(chalk.white(`     24h Change: ${tokenStats.change24h ? (tokenStats.change24h >= 0 ? '+' : '') + tokenStats.change24h.toFixed(2) + '%' : 'N/A'}`));
+                console.log(chalk.white(`     24h High: ${tokenStats.high24h?.toFixed(8) || 'N/A'} WLD`));
+                console.log(chalk.white(`     24h Low: ${tokenStats.low24h?.toFixed(8) || 'N/A'} WLD`));
+                console.log(chalk.white(`     Updates: ${tokenStats.updateCount || 0}`));
+            });
+        }
+        
+        await this.getUserInput('\nPress Enter to continue...');
     }
 }
 
