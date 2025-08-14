@@ -131,11 +131,20 @@ class StrategyBuilder extends EventEmitter {
         strategy.isActive = true;
         strategy.walletObject = walletObject;
         
-        // Initialize enhanced price history storage
+        // Initialize enhanced price history storage with SMA tracking
         if (!this.priceHistory.has(strategy.targetToken)) {
             this.priceHistory.set(strategy.targetToken, {
                 prices: [], // Array of {timestamp, price} objects
-                maxHistoryAge: Math.max(604800000, strategy.dipTimeframe * 2) // Keep 7 days or 2x dipTimeframe, whichever is longer
+                maxHistoryAge: 604800000, // Keep 7 days for full SMA analysis
+                smaCache: {
+                    '5min': { values: [], average: 0 },
+                    '1hour': { values: [], average: 0 },
+                    '6hour': { values: [], average: 0 },
+                    '24hour': { values: [], average: 0 },
+                    '1day': { values: [], average: 0 },
+                    '7day': { values: [], average: 0 }
+                },
+                lastSMAUpdate: 0
             });
         }
         
@@ -217,6 +226,12 @@ class StrategyBuilder extends EventEmitter {
                 priceHistory.shift();
             }
             
+            // Update SMA calculations (every 30 seconds to avoid excessive computation)
+            if (Date.now() - priceHistoryData.lastSMAUpdate > 30000) {
+                this.updateSMACalculations(strategy.targetToken, priceHistoryData);
+                priceHistoryData.lastSMAUpdate = Date.now();
+            }
+            
             // Check for open positions first
             const openPositions = strategy.positions.filter(p => p.status === 'open');
             
@@ -243,14 +258,23 @@ class StrategyBuilder extends EventEmitter {
                         const currentDrop = ((highestPrice - currentPrice) / highestPrice) * 100;
                         const dipTriggerPrice = highestPrice * (1 - strategy.dipThreshold / 100);
                         
-                        // Add historical context if enabled
+                        // Add SMA context and historical context if enabled
+                        let smaContext = '';
                         let historicalContext = '';
+                        
                         if (strategy.enableHistoricalComparison && priceHistory.length > 10) {
                             const historical = this.getHistoricalPriceAnalysis(priceHistory, currentPrice, strategy.historicalTimeframes);
                             historicalContext = ` | ${historical.summary}`;
                         }
                         
-                        console.log(`⏳ ${strategy.name}: Waiting for DIP | Current: ${currentPrice.toFixed(8)} | Need: ≤${dipTriggerPrice.toFixed(8)} | Drop: ${currentDrop.toFixed(2)}%/${strategy.dipThreshold}% (${strategy.dipTimeframeLabel})${historicalContext} | Runtime: ${timeRunning}s`);
+                        // Add SMA analysis
+                        const priceHistoryData = this.priceHistory.get(strategy.targetToken);
+                        if (priceHistoryData && priceHistoryData.smaCache) {
+                            const smaAnalysis = this.getSMAPriceAnalysis(currentPrice, priceHistoryData.smaCache);
+                            smaContext = ` | SMA: ${smaAnalysis}`;
+                        }
+                        
+                        console.log(`⏳ ${strategy.name}: Waiting for DIP | Current: ${currentPrice.toFixed(8)} | Need: ≤${dipTriggerPrice.toFixed(8)} | Drop: ${currentDrop.toFixed(2)}%/${strategy.dipThreshold}% (${strategy.dipTimeframeLabel})${historicalContext}${smaContext} | Runtime: ${timeRunning}s`);
                     } else {
                         console.log(`📊 ${strategy.name}: Building price history (${priceHistory.length}/2) | Current: ${currentPrice.toFixed(8)} WLD | Runtime: ${timeRunning}s`);
                     }
@@ -438,6 +462,146 @@ class StrategyBuilder extends EventEmitter {
         analysis.summary = summaryParts.length > 0 ? summaryParts.join(' ') : 'Near averages';
         
         return analysis;
+    }
+    
+    // Update SMA calculations for all timeframes
+    updateSMACalculations(tokenAddress, priceHistoryData) {
+        const now = Date.now();
+        const priceHistory = priceHistoryData.prices;
+        
+        // SMA timeframes in milliseconds
+        const smaTimeframes = {
+            '5min': 5 * 60 * 1000,      // 5 minutes
+            '1hour': 60 * 60 * 1000,    // 1 hour
+            '6hour': 6 * 60 * 60 * 1000, // 6 hours
+            '24hour': 24 * 60 * 60 * 1000, // 24 hours
+            '1day': 24 * 60 * 60 * 1000,   // 1 day (same as 24hour)
+            '7day': 7 * 24 * 60 * 60 * 1000 // 7 days
+        };
+        
+        // Calculate SMA for each timeframe
+        for (const [period, timeframeMs] of Object.entries(smaTimeframes)) {
+            const cutoffTime = now - timeframeMs;
+            
+            // Get prices within this timeframe
+            const periodPrices = priceHistory.filter(p => p.timestamp >= cutoffTime);
+            
+            if (periodPrices.length > 0) {
+                const prices = periodPrices.map(p => p.price);
+                const sum = prices.reduce((a, b) => a + b, 0);
+                const average = sum / prices.length;
+                
+                priceHistoryData.smaCache[period] = {
+                    values: prices,
+                    average: average,
+                    dataPoints: prices.length,
+                    timeframe: timeframeMs,
+                    lastUpdate: now
+                };
+            }
+        }
+    }
+    
+    // Get SMA price analysis summary
+    getSMAPriceAnalysis(currentPrice, smaCache) {
+        const periods = ['5min', '1hour', '6hour'];
+        const summaryParts = [];
+        
+        for (const period of periods) {
+            const sma = smaCache[period];
+            if (sma && sma.average > 0 && sma.dataPoints >= 3) {
+                const vsAverage = ((currentPrice - sma.average) / sma.average) * 100;
+                if (Math.abs(vsAverage) > 1) { // Only show significant differences
+                    const direction = vsAverage > 0 ? '+' : '';
+                    summaryParts.push(`${period}:${direction}${vsAverage.toFixed(1)}%`);
+                }
+            }
+        }
+        
+        return summaryParts.length > 0 ? summaryParts.join(' ') : 'Near SMAs';
+    }
+    
+    // Get detailed SMA analysis for a token
+    getDetailedSMAAnalysis(tokenAddress, currentPrice) {
+        const priceHistoryData = this.priceHistory.get(tokenAddress);
+        if (!priceHistoryData || !priceHistoryData.smaCache) {
+            return null;
+        }
+        
+        const analysis = {
+            currentPrice,
+            smaComparisons: {},
+            buySignals: [],
+            sellSignals: [],
+            overallSignal: 'NEUTRAL'
+        };
+        
+        const smaCache = priceHistoryData.smaCache;
+        let bullishCount = 0;
+        let bearishCount = 0;
+        
+        // Analyze each SMA period
+        for (const [period, sma] of Object.entries(smaCache)) {
+            if (sma.average > 0 && sma.dataPoints >= 3) {
+                const vsAverage = ((currentPrice - sma.average) / sma.average) * 100;
+                const isBullish = currentPrice > sma.average;
+                const isBearish = currentPrice < sma.average;
+                
+                analysis.smaComparisons[period] = {
+                    smaValue: sma.average,
+                    percentDifference: vsAverage,
+                    isBullish,
+                    isBearish,
+                    dataPoints: sma.dataPoints,
+                    signal: isBullish ? 'BUY' : isBearish ? 'SELL' : 'NEUTRAL'
+                };
+                
+                if (isBullish) {
+                    bullishCount++;
+                    if (Math.abs(vsAverage) > 2) {
+                        analysis.sellSignals.push(`Above ${period} SMA by ${vsAverage.toFixed(1)}%`);
+                    }
+                } else if (isBearish) {
+                    bearishCount++;
+                    if (Math.abs(vsAverage) > 2) {
+                        analysis.buySignals.push(`Below ${period} SMA by ${Math.abs(vsAverage).toFixed(1)}%`);
+                    }
+                }
+            }
+        }
+        
+        // Determine overall signal
+        const totalSignals = bullishCount + bearishCount;
+        if (totalSignals > 0) {
+            const bullishRatio = bullishCount / totalSignals;
+            if (bullishRatio >= 0.7) {
+                analysis.overallSignal = 'STRONG_SELL'; // Price above most SMAs
+            } else if (bullishRatio >= 0.5) {
+                analysis.overallSignal = 'WEAK_SELL';
+            } else if (bullishRatio <= 0.3) {
+                analysis.overallSignal = 'STRONG_BUY'; // Price below most SMAs
+            } else {
+                analysis.overallSignal = 'WEAK_BUY';
+            }
+        }
+        
+        return analysis;
+    }
+    
+    // Check if current price is good for buying based on SMA
+    isSMABuySignal(tokenAddress, currentPrice) {
+        const analysis = this.getDetailedSMAAnalysis(tokenAddress, currentPrice);
+        if (!analysis) return false;
+        
+        return analysis.overallSignal === 'STRONG_BUY' || analysis.overallSignal === 'WEAK_BUY';
+    }
+    
+    // Check if current price is good for selling based on SMA
+    isSMASellSignal(tokenAddress, currentPrice) {
+        const analysis = this.getDetailedSMAAnalysis(tokenAddress, currentPrice);
+        if (!analysis) return false;
+        
+        return analysis.overallSignal === 'STRONG_SELL' || analysis.overallSignal === 'WEAK_SELL';
     }
     
     // Get current price for a token (WLD per token)

@@ -3625,6 +3625,298 @@ class WorldchainTradingBot {
             console.log('');
         }
     }
+
+    // Execute time-based buy (buy at best SMA rate from specified period)
+    async executeTimeBasedBuy(parsed, tokenAddress) {
+        console.log(`🕐 Time-Based Buy: ${parsed.token} at best ${parsed.timeframe} rate`);
+        
+        // Get SMA analysis for the token
+        const smaAnalysis = this.strategyBuilder.getDetailedSMAAnalysis(tokenAddress, 0);
+        if (!smaAnalysis) {
+            console.log(`❌ No SMA data available for ${parsed.token}. Need price history first.`);
+            return { success: false };
+        }
+        
+        const timeframePeriod = this.parseTimeframeToSMAPeriod(parsed.timeframe);
+        const currentPrice = await this.getCurrentTokenPrice(tokenAddress);
+        const updatedAnalysis = this.strategyBuilder.getDetailedSMAAnalysis(tokenAddress, currentPrice);
+        
+        if (!updatedAnalysis.smaComparisons[timeframePeriod]) {
+            console.log(`❌ No ${parsed.timeframe} SMA data available for ${parsed.token}`);
+            return { success: false };
+        }
+        
+        const smaData = updatedAnalysis.smaComparisons[timeframePeriod];
+        const smaValue = smaData.smaValue;
+        
+        console.log(`📊 SMA Analysis for ${parsed.timeframe}:`);
+        console.log(`   📈 Current Price: ${currentPrice.toFixed(8)} WLD per ${parsed.token}`);
+        console.log(`   📊 ${parsed.timeframe} SMA: ${smaValue.toFixed(8)} WLD per ${parsed.token}`);
+        console.log(`   📊 Price vs SMA: ${smaData.percentDifference.toFixed(2)}%`);
+        console.log(`   🎯 Signal: ${smaData.signal}`);
+        
+        // Check if it's a good time to buy (price below SMA)
+        if (currentPrice >= smaValue) {
+            console.log(`❌ NOT OPTIMAL TIME TO BUY!`);
+            console.log(`   📊 Current price (${currentPrice.toFixed(8)}) is ABOVE ${parsed.timeframe} SMA (${smaValue.toFixed(8)})`);
+            console.log(`   💡 Better to wait for price to drop below SMA for optimal entry`);
+            
+            const waitChoice = await this.getUserInput('\nContinue anyway? (y/N): ');
+            if (!waitChoice.toLowerCase().startsWith('y')) {
+                return { success: false, message: 'Trade cancelled - waiting for better SMA entry point' };
+            }
+        } else {
+            console.log(`✅ OPTIMAL TIME TO BUY!`);
+            console.log(`   📊 Current price is ${Math.abs(smaData.percentDifference).toFixed(2)}% BELOW ${parsed.timeframe} SMA`);
+            console.log(`   🎯 This is a good entry point based on SMA analysis`);
+        }
+        
+        // Get wallet and amount
+        const walletChoice = await this.selectWalletForTrade();
+        if (!walletChoice && walletChoice !== 0) return { success: false };
+        
+        const wallet = this.wallets[walletChoice];
+        const amountInput = await this.getUserInput('Enter WLD amount to buy (or "all" for maximum): ');
+        
+        let tradeAmount;
+        if (amountInput.toLowerCase() === 'all') {
+            const wldBalance = await this.getWLDBalance(wallet.address);
+            tradeAmount = parseFloat(wldBalance) * 0.99;
+        } else {
+            tradeAmount = parseFloat(amountInput);
+            if (isNaN(tradeAmount) || tradeAmount <= 0) {
+                console.log('❌ Invalid amount');
+                return { success: false };
+            }
+        }
+        
+        // Execute the trade
+        const startTime = Date.now();
+        const result = await this.sinclaveEngine.executeOptimizedSwap(
+            wallet,
+            this.WLD_ADDRESS,
+            tokenAddress,
+            tradeAmount,
+            2 // 2% slippage
+        );
+        
+        const executionTime = Date.now() - startTime;
+        
+        if (result.success) {
+            console.log(`✅ TIME-BASED BUY SUCCESSFUL!`);
+            console.log(`   💰 Spent: ${tradeAmount} WLD`);
+            console.log(`   📈 Received: ${result.amountOut} ${parsed.token}`);
+            console.log(`   📊 Entry vs SMA: ${smaData.percentDifference.toFixed(2)}% (${smaData.signal})`);
+            console.log(`   ⚡ Execution Time: ${executionTime}ms`);
+            console.log(`   🧾 TX Hash: ${result.txHash}`);
+            
+            return {
+                success: true,
+                type: 'time_based_buy',
+                token: parsed.token,
+                tokenAddress,
+                amountIn: tradeAmount,
+                amountOut: result.amountOut,
+                txHash: result.txHash,
+                executionTime,
+                entryPrice: tradeAmount / parseFloat(result.amountOut),
+                wallet: wallet.address,
+                smaAnalysis: updatedAnalysis,
+                timeframe: parsed.timeframe
+            };
+        } else {
+            console.log(`❌ TIME-BASED BUY FAILED!`);
+            console.log(`   💥 Error: ${result.error}`);
+            return { success: false, error: result.error };
+        }
+    }
+    
+    // Execute time-based sell (sell at best SMA rate from specified period)
+    async executeTimeBasedSell(parsed, tokenAddress) {
+        console.log(`🕐 Time-Based Sell: ${parsed.token} at best ${parsed.timeframe} rate`);
+        
+        // Get SMA analysis for the token
+        const currentPrice = await this.getCurrentTokenPrice(tokenAddress);
+        const smaAnalysis = this.strategyBuilder.getDetailedSMAAnalysis(tokenAddress, currentPrice);
+        
+        if (!smaAnalysis) {
+            console.log(`❌ No SMA data available for ${parsed.token}. Need price history first.`);
+            return { success: false };
+        }
+        
+        const timeframePeriod = this.parseTimeframeToSMAPeriod(parsed.timeframe);
+        
+        if (!smaAnalysis.smaComparisons[timeframePeriod]) {
+            console.log(`❌ No ${parsed.timeframe} SMA data available for ${parsed.token}`);
+            return { success: false };
+        }
+        
+        const smaData = smaAnalysis.smaComparisons[timeframePeriod];
+        const smaValue = smaData.smaValue;
+        
+        console.log(`📊 SMA Analysis for ${parsed.timeframe}:`);
+        console.log(`   📈 Current Price: ${currentPrice.toFixed(8)} WLD per ${parsed.token}`);
+        console.log(`   📊 ${parsed.timeframe} SMA: ${smaValue.toFixed(8)} WLD per ${parsed.token}`);
+        console.log(`   📊 Price vs SMA: ${smaData.percentDifference.toFixed(2)}%`);
+        console.log(`   🎯 Signal: ${smaData.signal}`);
+        
+        // Check if it's a good time to sell (price above SMA)
+        if (currentPrice <= smaValue) {
+            console.log(`❌ NOT OPTIMAL TIME TO SELL!`);
+            console.log(`   📊 Current price (${currentPrice.toFixed(8)}) is BELOW ${parsed.timeframe} SMA (${smaValue.toFixed(8)})`);
+            console.log(`   💡 Better to wait for price to rise above SMA for optimal exit`);
+            
+            const waitChoice = await this.getUserInput('\nContinue anyway? (y/N): ');
+            if (!waitChoice.toLowerCase().startsWith('y')) {
+                return { success: false, message: 'Trade cancelled - waiting for better SMA exit point' };
+            }
+        } else {
+            console.log(`✅ OPTIMAL TIME TO SELL!`);
+            console.log(`   📊 Current price is ${smaData.percentDifference.toFixed(2)}% ABOVE ${parsed.timeframe} SMA`);
+            console.log(`   🎯 This is a good exit point based on SMA analysis`);
+        }
+        
+        // Get wallet and amount
+        const walletChoice = await this.selectWalletForTrade();
+        if (!walletChoice && walletChoice !== 0) return { success: false };
+        
+        const wallet = this.wallets[walletChoice];
+        
+        // Get token balance
+        const tokenBalance = await this.getTokenBalance(tokenAddress, wallet.address);
+        if (parseFloat(tokenBalance) === 0) {
+            console.log(`❌ No ${parsed.token} tokens to sell`);
+            return { success: false };
+        }
+        
+        const amountInput = await this.getUserInput(`Enter ${parsed.token} amount to sell (or "all" for ${tokenBalance}): `);
+        
+        let sellAmount;
+        if (amountInput.toLowerCase() === 'all') {
+            sellAmount = parseFloat(tokenBalance);
+        } else {
+            sellAmount = parseFloat(amountInput);
+            if (isNaN(sellAmount) || sellAmount <= 0 || sellAmount > parseFloat(tokenBalance)) {
+                console.log(`❌ Invalid amount. Available: ${tokenBalance} ${parsed.token}`);
+                return { success: false };
+            }
+        }
+        
+        // Execute the trade
+        const startTime = Date.now();
+        const result = await this.sinclaveEngine.executeOptimizedSwap(
+            wallet,
+            tokenAddress,
+            this.WLD_ADDRESS,
+            sellAmount,
+            2 // 2% slippage
+        );
+        
+        const executionTime = Date.now() - startTime;
+        
+        if (result.success) {
+            console.log(`✅ TIME-BASED SELL SUCCESSFUL!`);
+            console.log(`   📉 Sold: ${sellAmount} ${parsed.token}`);
+            console.log(`   💰 Received: ${result.amountOut} WLD`);
+            console.log(`   📊 Exit vs SMA: ${smaData.percentDifference.toFixed(2)}% (${smaData.signal})`);
+            console.log(`   ⚡ Execution Time: ${executionTime}ms`);
+            console.log(`   🧾 TX Hash: ${result.txHash}`);
+            
+            return {
+                success: true,
+                type: 'time_based_sell',
+                token: parsed.token,
+                tokenAddress,
+                amountIn: sellAmount,
+                amountOut: result.amountOut,
+                txHash: result.txHash,
+                executionTime,
+                exitPrice: parseFloat(result.amountOut) / sellAmount,
+                wallet: wallet.address,
+                smaAnalysis,
+                timeframe: parsed.timeframe
+            };
+        } else {
+            console.log(`❌ TIME-BASED SELL FAILED!`);
+            console.log(`   💥 Error: ${result.error}`);
+            return { success: false, error: result.error };
+        }
+    }
+    
+    // Execute strategy creation buy
+    async executeStrategyBuy(parsed, tokenAddress) {
+        console.log(`🎯 Creating Strategy: ${parsed.token} with ${parsed.amount} WLD, ${parsed.dipThreshold}% DIP, ${parsed.profitTarget}% profit`);
+        
+        // Create strategy configuration
+        const strategyConfig = {
+            name: `Quick_${parsed.token}_${Date.now()}`,
+            baseToken: this.WLD_ADDRESS,
+            targetToken: tokenAddress,
+            tokenSymbol: parsed.token,
+            dipThreshold: parsed.dipThreshold,
+            profitTarget: parsed.profitTarget,
+            tradeAmount: parsed.amount === 'all' ? await this.getAllWLDBalance() : parsed.amount,
+            maxSlippage: 2,
+            priceCheckInterval: 30000,
+            dipTimeframe: 300000, // 5 minutes
+            enableHistoricalComparison: false,
+            enableProfitRange: false
+        };
+        
+        // Create the strategy
+        const strategy = this.strategyBuilder.createStrategy(strategyConfig);
+        
+        console.log(`✅ STRATEGY CREATED SUCCESSFULLY!`);
+        console.log(`   📋 Strategy ID: ${strategy.id}`);
+        console.log(`   🎯 Will buy ${parsed.token} on ${parsed.dipThreshold}% DIP`);
+        console.log(`   📈 Will sell at ${parsed.profitTarget}% profit`);
+        console.log(`   💰 Trade amount: ${strategyConfig.tradeAmount} WLD`);
+        
+        // Ask if user wants to start it immediately
+        const startNow = await this.getUserInput('\nStart strategy immediately? (Y/n): ');
+        if (!startNow.toLowerCase().startsWith('n')) {
+            const walletChoice = await this.selectWalletForTrade();
+            if (walletChoice || walletChoice === 0) {
+                const wallet = this.wallets[walletChoice];
+                this.strategyBuilder.startStrategy(strategy.id, wallet);
+                console.log(`🚀 Strategy started and monitoring for opportunities!`);
+            }
+        }
+        
+        return {
+            success: true,
+            type: 'strategy_created',
+            strategyId: strategy.id,
+            token: parsed.token,
+            dipThreshold: parsed.dipThreshold,
+            profitTarget: parsed.profitTarget,
+            positionId: strategy.id
+        };
+    }
+    
+    // Helper method to parse timeframe to SMA period
+    parseTimeframeToSMAPeriod(timeframe) {
+        const mapping = {
+            '5m': '5min',
+            '1h': '1hour', 
+            '6h': '6hour',
+            '24h': '24hour',
+            '1d': '1day',
+            '7d': '7day'
+        };
+        
+        return mapping[timeframe] || '1hour';
+    }
+    
+    // Helper method to get all WLD balance
+    async getAllWLDBalance() {
+        if (Object.keys(this.wallets).length === 1) {
+            const wallet = Object.values(this.wallets)[0];
+            const balance = await this.getWLDBalance(wallet.address);
+            return parseFloat(balance) * 0.99; // 99% to leave buffer
+        }
+        return 0.1; // Default fallback
+    }
 }
 
 // Start the bot
