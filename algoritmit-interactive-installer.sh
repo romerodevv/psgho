@@ -68,6 +68,8 @@ ask_user() {
     if [[ -z "$user_input" && -n "$default" ]]; then
         user_input="$default"
     fi
+    # Trim whitespace and return the value
+    user_input=$(echo "$user_input" | tr -d '[:space:]')
     echo "$user_input"
 }
 
@@ -119,6 +121,7 @@ EOF
     echo ""
     
     local proceed=$(ask_user "Are you ready to start the interactive installation?" "yes")
+    proceed=$(echo "$proceed" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     if [[ "$proceed" != "yes" && "$proceed" != "y" ]]; then
         echo -e "${YELLOW}Installation cancelled. You can run this installer again anytime.${NC}"
         exit 0
@@ -261,6 +264,7 @@ install_nodejs() {
     echo ""
     
     local install_nodejs=$(ask_user "Install Node.js now?" "yes")
+    install_nodejs=$(echo "$install_nodejs" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     
     if [[ "$install_nodejs" == "yes" || "$install_nodejs" == "y" ]]; then
         show_progress "Installing Node.js..."
@@ -1120,6 +1124,7 @@ install_dependencies() {
     cd "$INSTALL_DIR" || exit 1
     
     local install_deps=$(ask_user "Install dependencies now? (Recommended)" "yes")
+    install_deps=$(echo "$install_deps" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     
     if [[ "$install_deps" == "yes" || "$install_deps" == "y" ]]; then
         show_progress "Installing Node.js packages..."
@@ -1820,6 +1825,7 @@ installation_complete() {
     echo ""
     
     local start_now=$(ask_user "Would you like to start the trading bot now?" "yes")
+    start_now=$(echo "$start_now" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     
     if [[ "$start_now" == "yes" || "$start_now" == "y" ]]; then
         echo ""
