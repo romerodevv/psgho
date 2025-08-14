@@ -1667,8 +1667,8 @@ class WorldchainTradingBot {
             console.log(chalk.gray('─'.repeat(40)));
             console.log(chalk.white(`📊 Status: ${stats.isRunning ? chalk.green('RUNNING') : chalk.red('STOPPED')}`));
             console.log(chalk.white(`📈 Open Positions: ${stats.openPositions}`));
-            console.log(chalk.white(`💰 Total P&L: ${stats.totalPnL.toFixed(4)} WLD`));
-            console.log(chalk.white(`📊 Success Rate: ${stats.successRate.toFixed(1)}%`));
+            console.log(chalk.white(`💰 Total P&L: ${(stats.totalPnL || 0).toFixed(4)} WLD`));
+            console.log(chalk.white(`📊 Success Rate: ${(stats.successRate || 0).toFixed(1)}%`));
             console.log(chalk.gray('─'.repeat(40)));
             
             console.log(chalk.cyan('1. 🚀 Start Strategy'));
@@ -2131,13 +2131,13 @@ class WorldchainTradingBot {
         console.log(chalk.white(`   Status: ${stats.isRunning ? chalk.green('RUNNING') : chalk.red('STOPPED')}`));
         console.log(chalk.white(`   Total Trades: ${stats.totalTrades}`));
         console.log(chalk.white(`   Successful Trades: ${stats.successfulTrades}`));
-        console.log(chalk.white(`   Success Rate: ${stats.successRate.toFixed(1)}%`));
+        console.log(chalk.white(`   Success Rate: ${(stats.successRate || 0).toFixed(1)}%`));
         
         console.log(chalk.cyan('\n💰 Profit & Loss:'));
         const totalPnLColor = stats.totalPnL >= 0 ? chalk.green : chalk.red;
-        console.log(chalk.white(`   Realized P&L: ${stats.totalRealizedPnL.toFixed(4)} WLD`));
-        console.log(chalk.white(`   Unrealized P&L: ${stats.totalUnrealizedPnL.toFixed(4)} WLD`));
-        console.log(totalPnLColor(`   Total P&L: ${stats.totalPnL.toFixed(4)} WLD`));
+        console.log(chalk.white(`   Realized P&L: ${(stats.totalRealizedPnL || 0).toFixed(4)} WLD`));
+        console.log(chalk.white(`   Unrealized P&L: ${(stats.totalUnrealizedPnL || 0).toFixed(4)} WLD`));
+        console.log(totalPnLColor(`   Total P&L: ${(stats.totalPnL || 0).toFixed(4)} WLD`));
         
         console.log(chalk.cyan('\n📊 Positions:'));
         console.log(chalk.white(`   Total Positions: ${stats.totalPositions}`));
@@ -2944,13 +2944,13 @@ class WorldchainTradingBot {
             console.log(`💹 Total Trades: ${stats.totalTrades}`);
             console.log(`✅ Successful Trades: ${stats.successfulTrades}`);
             console.log(`❌ Failed Trades: ${stats.failedTrades}`);
-            console.log(`📊 Success Rate: ${stats.successRate.toFixed(1)}%`);
-            console.log(`💰 Total Profit: ${stats.totalProfit.toFixed(6)} WLD`);
-            console.log(`📈 Average Profit per Trade: ${stats.averageProfitPerTrade.toFixed(6)} WLD`);
+            console.log(`📊 Success Rate: ${(stats.successRate || 0).toFixed(1)}%`);
+            console.log(`💰 Total Profit: ${(stats.totalProfit || 0).toFixed(6)} WLD`);
+            console.log(`📈 Average Profit per Trade: ${(stats.averageProfitPerTrade || 0).toFixed(6)} WLD`);
             
             if (stats.bestPerformingStrategy) {
                 console.log(`\n🏆 Best Performing Strategy: ${stats.bestPerformingStrategy.name}`);
-                console.log(`   💰 Profit: ${stats.bestPerformingStrategy.profit.toFixed(6)} WLD`);
+                console.log(`   💰 Profit: ${(stats.bestPerformingStrategy.profit || 0).toFixed(6)} WLD`);
             }
             
         } catch (error) {

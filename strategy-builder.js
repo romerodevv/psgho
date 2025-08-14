@@ -1263,8 +1263,19 @@ class StrategyBuilder extends EventEmitter {
         const failedTrades = strategies.reduce((sum, s) => sum + ((s.totalTrades || 0) - (s.successfulTrades || 0)), 0);
         const totalProfit = strategies.reduce((sum, s) => sum + (s.totalProfit || 0), 0);
         
-        // Calculate success rate safely
+        // Calculate success rate and average profit per trade safely
         const successRate = totalTrades > 0 ? (successfulTrades / totalTrades * 100) : 0;
+        const averageProfitPerTrade = totalTrades > 0 ? (totalProfit / totalTrades) : 0;
+        
+        // Find best performing strategy
+        let bestPerformingStrategy = null;
+        if (strategies.length > 0) {
+            bestPerformingStrategy = strategies.reduce((best, current) => {
+                const currentProfit = current.totalProfit || 0;
+                const bestProfit = best ? (best.totalProfit || 0) : 0;
+                return currentProfit > bestProfit ? current : best;
+            }, null);
+        }
         
         return {
             totalStrategies: strategies.length,
@@ -1273,8 +1284,13 @@ class StrategyBuilder extends EventEmitter {
             totalTrades,
             successfulTrades,
             failedTrades,
-            successRate: successRate.toFixed(2),
-            totalProfit: totalProfit.toFixed(6),
+            successRate: successRate,
+            totalProfit: totalProfit,
+            averageProfitPerTrade: averageProfitPerTrade,
+            bestPerformingStrategy: bestPerformingStrategy ? {
+                name: bestPerformingStrategy.name || 'Unknown',
+                profit: bestPerformingStrategy.totalProfit || 0
+            } : null,
             strategies: strategies.map(s => ({
                 id: s.id,
                 name: s.name,
@@ -1282,7 +1298,7 @@ class StrategyBuilder extends EventEmitter {
                 isActive: s.isActive || false,
                 totalTrades: s.totalTrades || 0,
                 successfulTrades: s.successfulTrades || 0,
-                totalProfit: (s.totalProfit || 0).toFixed(6),
+                totalProfit: (s.totalProfit || 0),
                 openPositions: (s.positions || []).filter(p => p.status === 'open').length
             }))
         };
