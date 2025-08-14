@@ -1,0 +1,2 @@
+d5d1d021577a2fd6df95829a56d51c69c9c6800acfc1f031ee6aac46a707af80  algoritmit-smart-volatility-v4.0.tar.gz
+1b18b2dfe620152c5d6e45c9ea944dc5e7d3765de8c227af186dfafe5faead6f  algoritmit-smart-volatility-v4.0.zip
