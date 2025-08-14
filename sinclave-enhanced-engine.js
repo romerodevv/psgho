@@ -146,61 +146,65 @@ class SinclaveEnhancedTradingEngine {
         return quote;
     }
     
-    // Calculate optimized gas settings (from sinclave.js) - ENHANCED FOR REPLACEMENT TXS
+    // Calculate optimized gas settings based on sinclave.js proven patterns
     calculateOptimizedGasSettings(networkGasPrice, isReplacementTx = false) {
-        const baseGasPrice = this.OPTIMAL_GAS_SETTINGS.baseGasPrice;
-        let priorityFee = this.OPTIMAL_GAS_SETTINGS.priorityFee;
+        // SPEED OPTIMIZATION: Use higher base gas for faster execution
+        const baseGasPrice = ethers.parseUnits('0.002', 'gwei'); // Increased from 0.001 for speed
+        const priorityFee = ethers.parseUnits('0.0005', 'gwei'); // Increased from 0.0001 for speed
         
-        // For replacement transactions, increase gas price by 10% minimum
-        if (isReplacementTx) {
-            priorityFee = priorityFee * BigInt(110) / BigInt(100); // 10% increase
-            console.log('⚡ Replacement transaction detected, increasing gas price by 10%');
-        }
-        
-        // Only increase if network demands it
+        // Use network gas if higher than our proven base (but prioritize speed)
         const networkGas = networkGasPrice || baseGasPrice;
         let finalGasPrice = networkGas > baseGasPrice ? networkGas : baseGasPrice;
+        let finalPriorityFee = priorityFee;
         
-        // For replacement transactions, ensure minimum 10% increase
+        // SPEED BOOST: Add 25% buffer for ultra-fast execution
+        finalGasPrice = finalGasPrice * BigInt(125) / BigInt(100); // 25% boost
+        finalPriorityFee = finalPriorityFee * BigInt(125) / BigInt(100); // 25% boost
+        
+        // For replacement transactions, increase by 15% (reduced from 10% for faster processing)
         if (isReplacementTx) {
-            finalGasPrice = finalGasPrice * BigInt(110) / BigInt(100);
+            finalPriorityFee = finalPriorityFee * BigInt(115) / BigInt(100); // 15% increase
+            finalGasPrice = finalGasPrice * BigInt(115) / BigInt(100);
+            console.log('⚡ Replacement transaction detected, increasing gas price by 15%');
         }
         
         return {
-            maxFeePerGas: finalGasPrice + priorityFee,
-            maxPriorityFeePerGas: priorityFee,
-            gasLimit: this.OPTIMAL_GAS_SETTINGS.gasLimit
+            maxFeePerGas: finalGasPrice + finalPriorityFee,
+            maxPriorityFeePerGas: finalPriorityFee,
+            gasLimit: 300000 // Increased from 280000 for complex swaps
         };
     }
     
     // Enhanced swap execution with sinclave.js patterns (OPTIMIZED FOR SPEED)
-    async executeOptimizedSwap(wallet, tokenIn, tokenOut, amountIn, slippageTolerance = 0.5) {
+    async executeOptimizedSwap(wallet, tokenIn, tokenOut, amountIn, slippageTolerance = 1) {
         const startTime = Date.now();
+        console.log(`🚀 Executing optimized swap: ${amountIn} tokens`);
         
         try {
-            console.log(`🚀 Executing optimized swap: ${amountIn} tokens`);
+            // Track total trades
             this.metrics.totalTrades++;
             
             // Step 1: Initialize optimized provider (CACHED)
             const provider = await this.initializeOptimizedProvider();
             const signer = new ethers.Wallet(wallet.privateKey, provider);
             
-            // Step 2: Parallel network checks (OPTIMIZED)
+            // Step 2: Parallel network checks (OPTIMIZED - removed individual logging)
             const [ethBalance, feeData, currentBlock] = await Promise.all([
                 provider.getBalance(signer.address),
                 provider.getFeeData(),
                 provider.getBlockNumber()
             ]);
             
+            // Quick status update (reduced logging)
             console.log(`💰 ETH Balance: ${ethers.formatEther(ethBalance)} ETH`);
             console.log(`⛽ Network Gas: ${ethers.formatUnits(feeData.gasPrice, 'gwei')} gwei`);
             console.log(`📦 Block: ${currentBlock}`);
             
-            // Step 3: Parallel token setup (OPTIMIZED)
+            // Step 3: Parallel token setup (FAST PATH)
             const tokenInContract = new ethers.Contract(tokenIn, this.ERC20_ABI, signer);
             const tokenOutContract = new ethers.Contract(tokenOut, this.ERC20_ABI, provider);
             
-            // Get all token info in parallel
+            // Get all token info in parallel + approval check
             const [tokenInDecimals, tokenOutDecimals, tokenInBalance, tokenOutBalanceBefore] = await Promise.all([
                 tokenInContract.decimals(),
                 tokenOutContract.decimals(),
@@ -210,6 +214,7 @@ class SinclaveEnhancedTradingEngine {
             
             const amountInWei = ethers.parseUnits(amountIn.toString(), tokenInDecimals);
             
+            // Quick balance check
             console.log(`📊 Token In Balance: ${ethers.formatUnits(tokenInBalance, tokenInDecimals)}`);
             console.log(`📊 Token Out Balance (Before): ${ethers.formatUnits(tokenOutBalanceBefore, tokenOutDecimals)}`);
             
@@ -248,7 +253,7 @@ class SinclaveEnhancedTradingEngine {
             const gasSettings = this.calculateOptimizedGasSettings(feeData.gasPrice);
             console.log(`⛽ Optimized Gas: ${ethers.formatUnits(gasSettings.maxFeePerGas, 'gwei')} gwei`);
             
-            // Step 7: Parallel approval check and execution (OPTIMIZED)
+            // Step 7: FAST APPROVAL - Check and approve in parallel if needed
             const currentAllowance = await tokenInContract.allowance(signer.address, fixedQuote.to);
             const needsApproval = currentAllowance < amountInWei;
             
@@ -264,14 +269,14 @@ class SinclaveEnhancedTradingEngine {
                 console.log(`📝 Approval TX: ${approveTx.hash}`);
                 console.log(`🔗 WorldScan: https://worldscan.org/tx/${approveTx.hash}`);
                 
-                // Wait for approval but continue preparing swap
-                const approvalReceipt = await approveTx.wait();
+                // OPTIMIZED: Wait for approval with faster confirmation
+                const approvalReceipt = await approveTx.wait(1); // Wait for 1 confirmation instead of default
                 console.log(`✅ Approval confirmed in block ${approvalReceipt.blockNumber}`);
             } else {
                 console.log('✅ Already approved - proceeding to swap');
             }
             
-            // Step 8: Execute optimized swap (FAST EXECUTION WITH REPLACEMENT TX HANDLING)
+            // Step 8: Execute optimized swap (ULTRA FAST EXECUTION)
             console.log('🔄 Executing optimized swap with proven patterns...');
             
             let swapTx;
@@ -303,7 +308,7 @@ class SinclaveEnhancedTradingEngine {
                     if (txError.code === 'REPLACEMENT_UNDERPRICED' && retryCount < maxRetries) {
                         console.log(`⚠️ Replacement fee too low, retrying with higher gas (attempt ${retryCount + 1}/${maxRetries + 1})`);
                         retryCount++;
-                        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+                        await new Promise(resolve => setTimeout(resolve, 500)); // Reduced from 1000ms to 500ms
                         continue;
                     } else {
                         throw txError; // Re-throw if not a replacement error or max retries reached
@@ -315,7 +320,8 @@ class SinclaveEnhancedTradingEngine {
             console.log(`🔗 WorldScan: https://worldscan.org/tx/${swapTx.hash}`);
             
             console.log('⏳ Waiting for confirmation...');
-            const receipt = await swapTx.wait();
+            // SPEED OPTIMIZATION: Wait for 1 confirmation instead of default 2
+            const receipt = await swapTx.wait(1);
             
             const executionTime = Date.now() - startTime;
             
@@ -324,10 +330,10 @@ class SinclaveEnhancedTradingEngine {
                 console.log(`⛽ Gas used: ${receipt.gasUsed.toString()}`);
                 console.log(`⚡ Total execution time: ${executionTime}ms`);
                 
-                // OPTIMIZATION: Reduce balance check wait from 3000ms to 1000ms
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // MAJOR SPEED OPTIMIZATION: Skip balance check delay entirely for speed
+                // The transaction is confirmed, balances are updated immediately
                 
-                // Step 9: Check final balances (PARALLEL)
+                // Step 9: Check final balances (PARALLEL - NO DELAY)
                 const [tokenInBalanceAfter, tokenOutBalanceAfter] = await Promise.all([
                     tokenInContract.balanceOf(signer.address),
                     tokenOutContract.balanceOf(signer.address)
@@ -338,7 +344,7 @@ class SinclaveEnhancedTradingEngine {
                 
                 console.log('🎉 OPTIMIZED SWAP SUCCESS!');
                 
-                // Calculate exchange rate
+                // Calculate exchange rate (streamlined)
                 if (tokensSpent > 0 && tokensReceived > 0) {
                     const tokensSpentFormatted = parseFloat(ethers.formatUnits(tokensSpent, tokenInDecimals));
                     const tokensReceivedFormatted = parseFloat(ethers.formatUnits(tokensReceived, tokenOutDecimals));
@@ -349,7 +355,14 @@ class SinclaveEnhancedTradingEngine {
                     }
                 }
                 
-                console.log(`⚡ Execution Time: ${executionTime}ms`);
+                // Performance feedback
+                if (executionTime < 3000) {
+                    console.log(`🚀 ULTRA-FAST EXECUTION: ${executionTime}ms - EXCELLENT!`);
+                } else if (executionTime < 6000) {
+                    console.log(`⚡ FAST EXECUTION: ${executionTime}ms - GOOD`);
+                } else {
+                    console.log(`⏳ STANDARD EXECUTION: ${executionTime}ms`);
+                }
                 
                 // Update metrics
                 this.metrics.successfulTrades++;
@@ -363,7 +376,8 @@ class SinclaveEnhancedTradingEngine {
                     tokensSpent: ethers.formatUnits(tokensSpent, tokenInDecimals),
                     tokensReceived: ethers.formatUnits(tokensReceived, tokenOutDecimals),
                     blockNumber: receipt.blockNumber,
-                    useHoldStationSDK: useHoldStationSDK
+                    useHoldStationSDK: useHoldStationSDK,
+                    amountOut: ethers.formatUnits(tokensReceived, tokenOutDecimals)
                 };
             } else {
                 throw new Error('Transaction failed');
@@ -372,13 +386,8 @@ class SinclaveEnhancedTradingEngine {
         } catch (error) {
             const executionTime = Date.now() - startTime;
             this.metrics.failedTrades++;
-            console.log(`❌ OPTIMIZED SWAP FAILED after ${executionTime}ms: ${error.message}`);
-            
-            return {
-                success: false,
-                error: error.message,
-                executionTime: executionTime
-            };
+            console.error(`❌ OPTIMIZED SWAP FAILED after ${executionTime}ms: ${error.message}`);
+            throw new Error(`Enhanced swap execution failed: ${error.message}`);
         }
     }
     
