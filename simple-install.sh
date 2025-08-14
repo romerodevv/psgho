@@ -45,7 +45,20 @@ fi
 # Check if command exists
 has_cmd() { command -v "$1" >/dev/null 2>&1; }
 
-# Step 1: Install Node.js if needed
+# Step 1: Fix any package management issues first
+info "Checking system package manager..."
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Fix common dpkg issues
+    if ! dpkg --configure -a >/dev/null 2>&1; then
+        warn "Fixing interrupted package installation..."
+        sudo dpkg --configure -a >/dev/null 2>&1 || true
+        sudo apt-get update --fix-missing >/dev/null 2>&1 || true
+        sudo apt-get install -f >/dev/null 2>&1 || true
+    fi
+    ok "Package manager ready"
+fi
+
+# Step 2: Install Node.js if needed
 info "Checking Node.js..."
 if has_cmd node; then
     NODE_VER=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
@@ -63,8 +76,32 @@ fi
 if [ "$NEED_NODE" = true ]; then
     info "Installing Node.js 20..."
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - >/dev/null 2>&1
-        sudo apt-get install -y nodejs >/dev/null 2>&1
+        # Update package lists first
+        sudo apt-get update >/dev/null 2>&1 || {
+            warn "Package update failed, trying system repair..."
+            sudo dpkg --configure -a >/dev/null 2>&1 || true
+            sudo apt-get update --fix-missing >/dev/null 2>&1 || true
+            sudo apt-get install -f >/dev/null 2>&1 || true
+            sudo apt-get update >/dev/null 2>&1 || true
+        }
+        
+        # Install Node.js with better error handling
+        if ! curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - >/dev/null 2>&1; then
+            warn "NodeSource setup failed, trying alternative method..."
+            # Alternative: Install from Ubuntu repos (older version but works)
+            sudo apt-get install -y nodejs npm >/dev/null 2>&1 || {
+                err "Failed to install Node.js. Please install manually from https://nodejs.org/"
+                exit 1
+            }
+        else
+            sudo apt-get install -y nodejs >/dev/null 2>&1 || {
+                warn "NodeSource install failed, trying Ubuntu repos..."
+                sudo apt-get install -y nodejs npm >/dev/null 2>&1 || {
+                    err "Failed to install Node.js. Please install manually from https://nodejs.org/"
+                    exit 1
+                }
+            }
+        fi
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         if has_cmd brew; then
             brew install node >/dev/null 2>&1
@@ -73,10 +110,18 @@ if [ "$NEED_NODE" = true ]; then
             exit 1
         fi
     fi
-    ok "Node.js installed"
+    
+    # Verify Node.js installation
+    if has_cmd node && has_cmd npm; then
+        ok "Node.js $(node --version) installed successfully"
+    else
+        err "Node.js installation verification failed"
+        info "Please install Node.js manually from https://nodejs.org/ and run this script again"
+        exit 1
+    fi
 fi
 
-# Step 2: Create directory
+# Step 3: Create directory
 info "Setting up directory..."
 if [ -d "$INSTALL_DIR" ]; then
     warn "Removing old installation..."
@@ -93,7 +138,7 @@ fi
 
 ok "Directory ready: $INSTALL_DIR"
 
-# Step 3: Download bot
+# Step 4: Download bot
 info "Downloading trading bot..."
 if has_cmd git; then
     git clone https://github.com/romerodevv/psgho.git . >/dev/null 2>&1
@@ -109,7 +154,7 @@ else
 fi
 ok "Bot downloaded"
 
-# Step 4: Install packages
+# Step 5: Install packages
 info "Installing packages (this may take 3-5 minutes)..."
 
 # Function to run npm as correct user
@@ -128,7 +173,7 @@ run_npm install @worldcoin/minikit-js@latest
 
 ok "All packages installed"
 
-# Step 5: Create simple config
+# Step 6: Create simple config
 info "Creating configuration..."
 cat > .env << 'EOF'
 # SIMPLE CONFIGURATION - EDIT YOUR PRIVATE KEY BELOW
@@ -149,7 +194,7 @@ PRIORITY_FEE=0.0005
 MAX_SLIPPAGE=1
 EOF
 
-# Step 6: Create simple start script
+# Step 7: Create simple start script
 cat > start.sh << 'EOF'
 #!/bin/bash
 echo "🚀 Starting Ultra-Fast Trading Bot..."
@@ -160,7 +205,7 @@ EOF
 
 chmod +x start.sh
 
-# Step 7: Create simple setup script
+# Step 8: Create simple setup script
 cat > setup.sh << 'EOF'
 #!/bin/bash
 echo "🔧 Quick Setup"
