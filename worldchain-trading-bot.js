@@ -2259,12 +2259,19 @@ class WorldchainTradingBot {
         console.clear();
         console.log('➕ CREATE NEW CUSTOM STRATEGY');
         console.log('════════════════════════════════════════════════════════════');
-        console.log('🎯 DIP STRATEGY EXPLANATION:');
+        console.log('🎯 AVERAGE PRICE DIP STRATEGY EXPLANATION:');
         console.log('   • Strategy monitors token price continuously');
         console.log('   • WAITS for price to drop by your DIP threshold %');
-        console.log('   • BUYS tokens only when DIP is detected');
-        console.log('   • SELLS back to WLD when profit target is reached');
+        console.log('   • BUYS tokens only when DIP is detected AND price ≤ average');
+        console.log('   • MAINTAINS average price - never buys above current average');
+        console.log('   • CONTINUES buying on additional DIPs to improve average');
+        console.log('   • SELLS ALL positions when price reaches profit target above average');
         console.log('   • Does NOT buy immediately when started!');
+        console.log('');
+        console.log('📊 EXAMPLE: Buy WLD→YIELD at 1.0, then price drops to 0.85');
+        console.log('   ✅ Will buy more (improves average from 1.0 to ~0.92)');
+        console.log('   ❌ Will NOT buy if price goes to 1.1 (above average)');
+        console.log('   🎯 Sells ALL when price reaches 1.15 (15% profit target)');
         console.log('════════════════════════════════════════════════════════════');
 
         try {
@@ -2349,11 +2356,13 @@ class WorldchainTradingBot {
             console.log(`📉 DIP Threshold: ${dipThreshold}%`);
             console.log(`📈 Profit Target: ${profitTarget}%`);
             console.log(`💰 Trade Amount: ${tradeAmount} WLD`);
-            console.log(`\n🎯 STRATEGY BEHAVIOR:`);
+            console.log(`\n🎯 AVERAGE PRICE STRATEGY BEHAVIOR:`);
             console.log(`   1️⃣ Monitor ${tokenInfo.symbol} price continuously`);
             console.log(`   2️⃣ WAIT for ${dipThreshold}% price drop (DIP)`);
-            console.log(`   3️⃣ BUY ${tradeAmount} WLD → ${tokenInfo.symbol} when DIP detected`);
-            console.log(`   4️⃣ SELL back to WLD when ${profitTarget}% profit reached`);
+            console.log(`   3️⃣ BUY ${tradeAmount} WLD → ${tokenInfo.symbol} ONLY if price ≤ average`);
+            console.log(`   4️⃣ CONTINUE buying on additional DIPs to improve average price`);
+            console.log(`   5️⃣ NEVER buy above current average price`);
+            console.log(`   6️⃣ SELL ALL positions when ${profitTarget}% profit above average reached`);
 
         } catch (error) {
             console.log(`❌ Error creating strategy: ${error.message}`);
@@ -2430,13 +2439,17 @@ class WorldchainTradingBot {
         try {
             await this.strategyBuilder.startStrategy(strategy.id, walletObject);
             console.log(`\n✅ Strategy "${strategy.name}" started successfully!`);
-            console.log(`\n🎯 STRATEGY IS NOW ACTIVE:`);
+            console.log(`\n🎯 AVERAGE PRICE STRATEGY IS NOW ACTIVE:`);
             console.log(`   🔍 Monitoring ${strategy.targetTokenSymbol} price every 5 seconds`);
             console.log(`   📉 Waiting for ${strategy.dipThreshold}% price drop to BUY`);
             console.log(`   💰 Will trade ${strategy.tradeAmount} WLD when DIP detected`);
-            console.log(`   📈 Will sell back to WLD at ${strategy.profitTarget}% profit`);
-            console.log(`\n⚠️  IMPORTANT: Strategy will NOT buy immediately!`);
-            console.log(`   It waits for the DIP threshold to be reached first.`);
+            console.log(`   📊 Will ONLY buy if price is ≤ current average price`);
+            console.log(`   🔄 Will continue buying on additional DIPs to improve average`);
+            console.log(`   📈 Will sell ALL positions at ${strategy.profitTarget}% profit above average`);
+            console.log(`\n⚠️  IMPORTANT: Strategy maintains average price discipline!`);
+            console.log(`   • Never buys above current average price`);
+            console.log(`   • Improves average by buying on dips only`);
+            console.log(`   • Sells entire portfolio when profit target reached`);
         } catch (error) {
             console.log(`❌ Error starting strategy: ${error.message}`);
         }

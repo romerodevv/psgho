@@ -192,19 +192,43 @@ class StrategyBuilder extends EventEmitter {
                 console.log(`   📈 Current Price: ${currentPrice.toFixed(8)} WLD per token`);
                 
                 if (openPositions.length === 0) {
-                    // Calculate how far we are from DIP threshold
+                    // No positions yet - show DIP detection status
                     if (priceHistory.length >= 2) {
                         const highestPrice = Math.max(...priceHistory.map(p => p.price));
                         const currentDrop = ((highestPrice - currentPrice) / highestPrice) * 100;
                         const remainingDrop = strategy.dipThreshold - currentDrop;
                         
                         if (remainingDrop > 0) {
-                            console.log(`   📉 Need ${remainingDrop.toFixed(2)}% more drop for DIP buy (${currentDrop.toFixed(2)}% / ${strategy.dipThreshold}%)`);
+                            console.log(`   📉 Need ${remainingDrop.toFixed(2)}% more drop for INITIAL DIP buy (${currentDrop.toFixed(2)}% / ${strategy.dipThreshold}%)`);
                         } else {
                             console.log(`   ⚠️ DIP threshold reached but no buy executed - checking conditions...`);
                         }
                     } else {
                         console.log(`   📊 Building price history... (${priceHistory.length}/2 points)`);
+                    }
+                } else {
+                    // Show average price strategy status
+                    const totalWLD = openPositions.reduce((sum, pos) => sum + pos.entryAmountWLD, 0);
+                    const totalTokens = openPositions.reduce((sum, pos) => sum + pos.entryAmountToken, 0);
+                    const averagePrice = totalWLD / totalTokens;
+                    const targetPrice = averagePrice * (1 + strategy.profitTarget / 100);
+                    
+                    console.log(`   📊 AVERAGE PRICE STRATEGY:`);
+                    console.log(`      💰 Total Investment: ${totalWLD.toFixed(6)} WLD`);
+                    console.log(`      📊 Average Price: ${averagePrice.toFixed(8)} WLD per token`);
+                    console.log(`      🎯 Target Price: ${targetPrice.toFixed(8)} WLD per token`);
+                    
+                    if (currentPrice <= averagePrice) {
+                        console.log(`      ✅ Current price BELOW average - will buy on next ${strategy.dipThreshold}% DIP`);
+                    } else {
+                        console.log(`      ⏳ Current price ABOVE average - holding positions, no buying`);
+                    }
+                    
+                    if (currentPrice >= targetPrice) {
+                        console.log(`      🚀 PROFIT TARGET REACHED - will sell all positions!`);
+                    } else {
+                        const profitNeeded = ((targetPrice - currentPrice) / currentPrice) * 100;
+                        console.log(`      📈 Need ${profitNeeded.toFixed(2)}% more gain for profit target`);
                     }
                 }
             }
@@ -269,8 +293,14 @@ class StrategyBuilder extends EventEmitter {
             if (currentPrice > averagePrice) {
                 console.log(`⚠️  Price Protection: Current price (${currentPrice.toFixed(8)}) is HIGHER than average (${averagePrice.toFixed(8)})`);
                 console.log(`   🚫 NOT buying - we only buy when price is same or lower than our average`);
+                console.log(`   📊 We maintain our position and wait for:`);
+                console.log(`      • Price to drop to/below average: ${averagePrice.toFixed(8)} WLD`);
+                console.log(`      • OR profit target reached: ${(averagePrice * (1 + strategy.profitTarget / 100)).toFixed(8)} WLD`);
                 return;
             }
+            
+            console.log(`✅ Price Protection: Current price (${currentPrice.toFixed(8)}) is LOWER than average (${averagePrice.toFixed(8)})`);
+            console.log(`   📉 This will IMPROVE our average price - good DIP buy opportunity!`);
         }
         
         // Find the highest price in the timeframe
