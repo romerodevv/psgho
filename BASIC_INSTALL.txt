@@ -1,0 +1,74 @@
+🚀 ULTRA-FAST TRADING BOT - BASIC INSTALLATION
+
+══════════════════════════════════════════════════════════════
+
+📥 ONE COMMAND INSTALLATION:
+
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/basic-install.sh | bash
+
+══════════════════════════════════════════════════════════════
+
+📦 DOWNLOAD PACKAGE:
+
+wget https://github.com/romerodevv/psgho/raw/main/worldchain-bot-ultrafast-v2.1.tar.gz
+tar -xzf worldchain-bot-ultrafast-v2.1.tar.gz
+cd worldchain-bot-ultrafast-v2.1
+npm install
+cp .env.example .env
+nano .env  # Add your private key
+node worldchain-trading-bot.js
+
+══════════════════════════════════════════════════════════════
+
+🔧 MANUAL INSTALLATION:
+
+git clone https://github.com/romerodevv/psgho.git trading-bot
+cd trading-bot
+npm install
+cp .env.example .env
+nano .env  # Add your private key  
+node worldchain-trading-bot.js
+
+══════════════════════════════════════════════════════════════
+
+⚙️ CONFIGURATION:
+
+Edit .env file:
+PRIVATE_KEY=your_wallet_private_key_here
+WORLDCHAIN_RPC_URL=https://worldchain-mainnet.g.alchemy.com/public
+WLD_TOKEN_ADDRESS=0x2cfc85d8e48f8eab294be644d9e25c3030863003
+
+══════════════════════════════════════════════════════════════
+
+🚀 FEATURES:
+
+✅ <3 second trade execution (70% faster)
+✅ Color-coded profits (green) and losses (red)
+✅ Flexible configuration (any percentage values)
+✅ Strategy Builder for custom trading
+✅ Real-time performance feedback
+
+══════════════════════════════════════════════════════════════
+
+💡 USAGE:
+
+1. Install using any method above
+2. Edit .env with your private key
+3. Run: node worldchain-trading-bot.js
+4. Choose "Enhanced Trade" for fastest execution
+5. Watch profits in GREEN, losses in RED
+
+══════════════════════════════════════════════════════════════
+
+📊 REQUIREMENTS:
+
+✅ Linux/macOS
+✅ Node.js 18+ (auto-installed)
+✅ 2GB+ RAM
+✅ Internet connection
+
+══════════════════════════════════════════════════════════════
+
+🎉 READY TO TRADE!
+
+Simple, fast installation - just like the original versions!
