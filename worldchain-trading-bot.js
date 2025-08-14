@@ -728,11 +728,12 @@ class WorldchainTradingBot {
             console.log(chalk.cyan('2. 🔄 Standard Trade'));
             console.log(chalk.cyan('3. 📊 View Trading Pairs'));
             console.log(chalk.cyan('4. 🔍 Check Pair Liquidity'));
-            console.log(chalk.cyan('5. 💡 Suggest Valid Trading Pairs'));
-            console.log(chalk.cyan('6. ⚡ High-Speed Trading Mode'));
-            console.log(chalk.cyan('7. 📈 Price Monitoring'));
-            console.log(chalk.cyan('8. 📋 Trade History'));
-            console.log(chalk.red('9. ⬅️  Back to Main Menu'));
+            console.log(chalk.cyan('5. 📊 Liquidity Depth Analysis'));
+            console.log(chalk.cyan('6. 💡 Suggest Valid Trading Pairs'));
+            console.log(chalk.cyan('7. ⚡ High-Speed Trading Mode'));
+            console.log(chalk.cyan('8. 📈 Price Monitoring'));
+            console.log(chalk.cyan('9. 📋 Trade History'));
+            console.log(chalk.red('10. ⬅️  Back to Main Menu'));
             
             const choice = await this.getUserInput('\nSelect option (Enter for Enhanced Trade): ');
             
@@ -750,18 +751,21 @@ class WorldchainTradingBot {
                     await this.checkPairLiquidity();
                     break;
                 case '5':
-                    await this.suggestValidTradingPairs();
+                    await this.liquidityDepthAnalysis();
                     break;
                 case '6':
-                    await this.highSpeedTradingMode();
+                    await this.suggestValidTradingPairs();
                     break;
                 case '7':
-                    await this.priceMonitoring();
+                    await this.highSpeedTradingMode();
                     break;
                 case '8':
-                    await this.tradeHistory();
+                    await this.priceMonitoring();
                     break;
                 case '9':
+                    await this.tradeHistory();
+                    break;
+                case '10':
                     return;
                 default:
                     console.log(chalk.red('❌ Invalid option'));
@@ -2597,6 +2601,95 @@ class WorldchainTradingBot {
             console.log(`❌ Error deleting strategy: ${error.message}`);
         }
 
+        await this.getUserInput('\nPress Enter to continue...');
+    }
+
+    // Liquidity depth analysis for trading pairs
+    async liquidityDepthAnalysis() {
+        console.clear();
+        console.log(chalk.white('\n📊 LIQUIDITY DEPTH ANALYSIS'));
+        console.log(chalk.gray('═'.repeat(50)));
+        console.log(chalk.white('Find the maximum tradeable amount for different slippage tolerances'));
+        
+        // Popular tokens + discovered tokens
+        const popularTokens = [
+            { address: '0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63', symbol: 'ORO', name: 'ORO Token' },
+            { address: '0x1a16f733b813a59815a76293dac835ad1c7fedff', symbol: 'YIELD', name: 'YIELD Token' },
+            { address: '0xc6f44893a558d9ae0576a2bb6bfa9c1c3f313815', symbol: 'Ramen', name: 'Ramen Token' }
+        ];
+        
+        // Add discovered tokens
+        for (const [address, token] of Object.entries(this.discoveredTokens)) {
+            if (address.toLowerCase() !== this.WLD_ADDRESS.toLowerCase()) {
+                if (!popularTokens.find(t => t.address.toLowerCase() === address.toLowerCase())) {
+                    popularTokens.push({
+                        address: address,
+                        symbol: token.symbol || 'Unknown',
+                        name: token.name || 'Unknown Token'
+                    });
+                }
+            }
+        }
+        
+        if (popularTokens.length === 0) {
+            console.log(chalk.yellow('\n📭 No tokens available for analysis.'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+
+        console.log(chalk.white('\n📋 Available Pairs:'));
+        popularTokens.forEach((token, index) => {
+            console.log(`${index + 1}. WLD → ${token.symbol} (${token.name})`);
+        });
+
+        const tokenChoice = await this.getUserInput('\nSelect trading pair (number): ');
+        const tokenIndex = parseInt(tokenChoice) - 1;
+        
+        if (tokenIndex < 0 || tokenIndex >= popularTokens.length) {
+            console.log(chalk.red('❌ Invalid selection.'));
+            await this.getUserInput('\nPress Enter to continue...');
+            return;
+        }
+
+        const selectedToken = popularTokens[tokenIndex];
+        
+        console.log(chalk.white(`\n🔍 Analyzing liquidity depth for WLD → ${selectedToken.symbol}...`));
+        console.log(chalk.gray('═'.repeat(60)));
+        
+        try {
+            // Test multiple slippage tolerances
+            const slippageTests = [0.5, 1.0, 2.0, 5.0];
+            
+            for (const slippage of slippageTests) {
+                console.log(chalk.cyan(`\n📊 Testing ${slippage}% slippage tolerance:`));
+                
+                const analysis = await this.sinclaveEngine.analyzeLiquidityDepth(
+                    this.WLD_ADDRESS,
+                    selectedToken.address,
+                    slippage
+                );
+                
+                console.log(chalk.white(`   🎯 Maximum tradeable: ${analysis.maxAmount} WLD`));
+                
+                if (analysis.results.length > 0) {
+                    console.log(chalk.gray('   📊 Detailed breakdown:'));
+                    analysis.results.forEach(result => {
+                        const status = result.acceptable ? chalk.green('✅') : chalk.red('❌');
+                        console.log(`      ${status} ${result.amount} WLD: ${result.slippage.toFixed(2)}% slippage`);
+                    });
+                }
+            }
+            
+            console.log(chalk.green('\n✅ Liquidity analysis completed!'));
+            console.log(chalk.white('\n💡 Recommendations:'));
+            console.log(chalk.white('   • Use smaller amounts for better slippage'));
+            console.log(chalk.white('   • Consider splitting large trades'));
+            console.log(chalk.white('   • Monitor liquidity changes over time'));
+            
+        } catch (error) {
+            console.log(chalk.red(`❌ Analysis failed: ${error.message}`));
+        }
+        
         await this.getUserInput('\nPress Enter to continue...');
     }
 

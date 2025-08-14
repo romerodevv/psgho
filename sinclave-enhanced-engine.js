@@ -392,6 +392,73 @@ class SinclaveEnhancedTradingEngine {
         }
     }
     
+    // Analyze liquidity depth to find maximum tradeable amount with target slippage
+    async analyzeLiquidityDepth(tokenIn, tokenOut, targetSlippage = 1.0) {
+        try {
+            console.log(`🔍 Analyzing liquidity depth for ${targetSlippage}% slippage...`);
+            
+            // Test different amounts to find the maximum with acceptable slippage
+            const testAmounts = [0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0]; // WLD amounts to test
+            const results = [];
+            
+            for (const amount of testAmounts) {
+                try {
+                    const quote = await this.getHoldStationQuote(tokenIn, tokenOut, amount, '0x0000000000000000000000000000000000000001');
+                    
+                    if (quote && quote.expectedOutput) {
+                        const expectedRate = parseFloat(quote.expectedOutput) / amount; // tokens per WLD
+                        
+                        // Get a small reference quote to calculate slippage
+                        const refQuote = await this.getHoldStationQuote(tokenIn, tokenOut, 0.01, '0x0000000000000000000000000000000000000001');
+                        const refRate = parseFloat(refQuote.expectedOutput) / 0.01;
+                        
+                        // Calculate slippage: (referenceRate - actualRate) / referenceRate * 100
+                        const slippage = ((refRate - expectedRate) / refRate) * 100;
+                        
+                        results.push({
+                            amount: amount,
+                            expectedOutput: parseFloat(quote.expectedOutput),
+                            rate: expectedRate,
+                            slippage: slippage,
+                            acceptable: slippage <= targetSlippage
+                        });
+                        
+                        console.log(`   📊 ${amount} WLD: ${expectedRate.toFixed(8)} rate, ${slippage.toFixed(2)}% slippage ${slippage <= targetSlippage ? '✅' : '❌'}`);
+                        
+                        // If slippage exceeds target, we've found our limit
+                        if (slippage > targetSlippage) {
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    console.log(`   ❌ ${amount} WLD: Failed to get quote`);
+                    break;
+                }
+            }
+            
+            // Find the maximum acceptable amount
+            const acceptableResults = results.filter(r => r.acceptable);
+            const maxAcceptableAmount = acceptableResults.length > 0 ? 
+                Math.max(...acceptableResults.map(r => r.amount)) : 0.01;
+            
+            console.log(`🎯 Maximum tradeable amount: ${maxAcceptableAmount} WLD (≤${targetSlippage}% slippage)`);
+            
+            return {
+                maxAmount: maxAcceptableAmount,
+                results: results,
+                recommendation: maxAcceptableAmount
+            };
+            
+        } catch (error) {
+            console.log(`❌ Liquidity analysis failed: ${error.message}`);
+            return {
+                maxAmount: 0.01, // Conservative fallback
+                results: [],
+                recommendation: 0.01
+            };
+        }
+    }
+
     // Get quote using HoldStation SDK (OPTIMIZED WITH CACHING)
     async getHoldStationQuote(tokenIn, tokenOut, amountIn, receiver) {
         try {

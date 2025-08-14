@@ -403,23 +403,43 @@ class StrategyBuilder extends EventEmitter {
         }
     }
     
-    // Execute a DIP buy trade with AVERAGE PRICE TRACKING
+    // Execute a DIP buy trade with AVERAGE PRICE TRACKING and LIQUIDITY ANALYSIS
     async executeDipBuy(strategy, entryPrice, previousAveragePrice) {
         try {
             console.log(`🔄 Executing DIP buy: ${strategy.tradeAmount} WLD → ${strategy.targetTokenSymbol}`);
             
-            // Execute the trade using Sinclave Enhanced Engine
+            // Analyze liquidity depth to optimize trade amount
+            console.log(`🔍 Checking liquidity depth for optimal trade size...`);
+            const liquidityAnalysis = await this.sinclaveEngine.analyzeLiquidityDepth(
+                this.WLD_ADDRESS,
+                strategy.targetToken,
+                strategy.maxSlippage
+            );
+            
+            // Determine optimal trade amount
+            let optimalAmount = strategy.tradeAmount;
+            if (liquidityAnalysis.maxAmount < strategy.tradeAmount) {
+                console.log(`⚠️  Liquidity Warning: Requested ${strategy.tradeAmount} WLD exceeds optimal amount`);
+                console.log(`   📊 Maximum for ${strategy.maxSlippage}% slippage: ${liquidityAnalysis.maxAmount} WLD`);
+                console.log(`   🎯 Adjusting trade amount to: ${liquidityAnalysis.maxAmount} WLD`);
+                optimalAmount = liquidityAnalysis.maxAmount;
+            } else {
+                console.log(`✅ Liquidity Check: ${strategy.tradeAmount} WLD is within optimal range`);
+                console.log(`   📊 Pool can handle up to: ${liquidityAnalysis.maxAmount} WLD at ${strategy.maxSlippage}% slippage`);
+            }
+            
+            // Execute the trade using Sinclave Enhanced Engine with optimal amount
             const result = await this.sinclaveEngine.executeOptimizedSwap(
                 strategy.walletObject,
                 this.WLD_ADDRESS,
                 strategy.targetToken,
-                strategy.tradeAmount,
+                optimalAmount,
                 strategy.maxSlippage
             );
             
             if (result && result.success) {
                 const tokensReceived = parseFloat(result.tokensReceived || result.amountOut || 0);
-                const actualEntryPrice = strategy.tradeAmount / tokensReceived; // Actual price paid
+                const actualEntryPrice = optimalAmount / tokensReceived; // Actual price paid (using optimal amount)
                 
                 // Create position record
                 const position = {
@@ -430,7 +450,7 @@ class StrategyBuilder extends EventEmitter {
                     
                     // Entry data
                     entryPrice: actualEntryPrice, // Use actual executed price
-                    entryAmountWLD: strategy.tradeAmount,
+                    entryAmountWLD: optimalAmount, // Use actual amount traded
                     entryAmountToken: tokensReceived,
                     entryTimestamp: Date.now(),
                     entryTxHash: result.transactionHash || result.txHash,
@@ -457,8 +477,13 @@ class StrategyBuilder extends EventEmitter {
                 
                 console.log(`✅ DIP buy executed successfully!`);
                 console.log(`   📊 Position: ${position.id}`);
-                console.log(`   💰 Entry: ${strategy.tradeAmount} WLD → ${position.entryAmountToken.toFixed(6)} tokens`);
+                console.log(`   💰 Entry: ${optimalAmount} WLD → ${position.entryAmountToken.toFixed(6)} tokens`);
                 console.log(`   📈 Entry Price: ${actualEntryPrice.toFixed(8)} WLD per token`);
+                
+                if (optimalAmount !== strategy.tradeAmount) {
+                    console.log(`   ⚖️  Liquidity Adjusted: ${strategy.tradeAmount} WLD → ${optimalAmount} WLD`);
+                    console.log(`   📊 Reason: Pool liquidity limited for ${strategy.maxSlippage}% slippage`);
+                }
                 
                 if (previousAveragePrice) {
                     console.log(`   📊 Previous Avg: ${previousAveragePrice.toFixed(8)} WLD per token`);
