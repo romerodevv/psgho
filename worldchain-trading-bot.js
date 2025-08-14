@@ -3236,93 +3236,291 @@ class WorldchainTradingBot {
         }
     }
 
-    // Start real-time position tracking
-    async startPositionTracking(position) {
-        console.log(`🎯 TRACKING POSITION: ${position.token}`);
-        console.log(`   📍 Position ID: ${position.id}`);
-        console.log(`   💰 Entry: ${position.amountIn} WLD → ${position.amountOut} ${position.token}`);
-        console.log(`   📈 Entry Price: ${position.entryPrice.toFixed(8)} WLD per ${position.token}`);
-        console.log(`   🧾 TX: ${position.txHash}`);
-        console.log('─'.repeat(80));
-        
-        let updateCount = 0;
-        const maxUpdates = 60; // Track for 5 minutes (5-second intervals)
-        
-        const trackingInterval = setInterval(async () => {
-            try {
-                updateCount++;
-                
-                // Get current price
-                const currentPrice = await this.getCurrentTokenPrice(position.tokenAddress);
-                const currentValue = position.amountOut * currentPrice;
-                const pnl = currentValue - position.initialValue;
-                const pnlPercent = (pnl / position.initialValue) * 100;
-                
-                // Color coding for profit/loss
-                const pnlColor = pnl >= 0 ? '\x1b[32m' : '\x1b[31m'; // Green or Red
-                const resetColor = '\x1b[0m';
-                
-                console.log(`\n📊 Position Update #${updateCount}:`);
-                console.log(`   ⏰ Runtime: ${Math.floor((Date.now() - position.entryTime) / 1000)}s`);
-                console.log(`   📈 Current Price: ${currentPrice.toFixed(8)} WLD per ${position.token}`);
-                console.log(`   💰 Current Value: ${currentValue.toFixed(6)} WLD`);
-                console.log(`   ${pnlColor}💹 P&L: ${pnl.toFixed(6)} WLD (${pnlPercent.toFixed(2)}%)${resetColor}`);
-                
-                if (pnl >= 0) {
-                    console.log(`   ✅ STATUS: IN PROFIT 📈`);
-                } else {
-                    console.log(`   ❌ STATUS: IN LOSS 📉`);
-                }
-                
-                // Stop tracking after maxUpdates or if user wants to exit
-                if (updateCount >= maxUpdates) {
-                    clearInterval(trackingInterval);
-                    console.log(`\n⏰ Tracking completed (${maxUpdates} updates)`);
-                    await this.showFinalResults(position, { currentPrice, currentValue, pnl, pnlPercent });
-                }
-                
-            } catch (error) {
-                console.log(`❌ Tracking error: ${error.message}`);
-            }
-        }, 5000); // Update every 5 seconds
-        
-        // Allow user to stop tracking early
-        setTimeout(async () => {
-            const stopChoice = await this.getUserInput('\n⏹️  Press Enter to stop tracking and return to commands...');
-            clearInterval(trackingInterval);
-            console.log(`\n🛑 Position tracking stopped by user`);
-        }, 2000);
-    }
+         // Start real-time position tracking with DIP averaging strategy
+     async startPositionTracking(position) {
+         console.log(`🎯 TRACKING POSITION: ${position.token}`);
+         console.log(`   📍 Position ID: ${position.id}`);
+         console.log(`   💰 Initial Entry: ${position.amountIn} WLD → ${position.amountOut} ${position.token}`);
+         console.log(`   📈 Entry Price: ${position.entryPrice.toFixed(8)} WLD per ${position.token}`);
+         console.log(`   🧾 TX: ${position.txHash}`);
+         console.log('─'.repeat(80));
+         
+         // Initialize DIP averaging strategy
+         position.dipStrategy = {
+             enabled: true,
+             dipThreshold: 5, // 5% dip to trigger buy
+             maxDipBuys: 3,   // Maximum number of DIP buys
+             dipBuysCount: 0,
+             priceHistory: [],
+             totalWLDInvested: position.amountIn,
+             totalTokensOwned: position.amountOut,
+             averagePrice: position.entryPrice,
+             lastDipBuy: null
+         };
+         
+         console.log(`🎯 DIP AVERAGING STRATEGY ACTIVE:`);
+         console.log(`   📉 DIP Threshold: ${position.dipStrategy.dipThreshold}%`);
+         console.log(`   🔄 Max DIP Buys: ${position.dipStrategy.maxDipBuys}`);
+         console.log(`   💰 Strategy will buy more tokens on dips to improve average price`);
+         console.log('─'.repeat(80));
+         
+         let updateCount = 0;
+         const maxUpdates = 120; // Track for 10 minutes (5-second intervals)
+         
+         const trackingInterval = setInterval(async () => {
+             try {
+                 updateCount++;
+                 
+                 // Get current price
+                 const currentPrice = await this.getCurrentTokenPrice(position.tokenAddress);
+                 
+                 // Store price in history for DIP detection
+                 position.dipStrategy.priceHistory.push({
+                     timestamp: Date.now(),
+                     price: currentPrice
+                 });
+                 
+                 // Keep only last 20 price points (100 seconds of history)
+                 if (position.dipStrategy.priceHistory.length > 20) {
+                     position.dipStrategy.priceHistory.shift();
+                 }
+                 
+                 // Calculate current position value
+                 const currentValue = position.dipStrategy.totalTokensOwned * currentPrice;
+                 const pnl = currentValue - position.dipStrategy.totalWLDInvested;
+                 const pnlPercent = (pnl / position.dipStrategy.totalWLDInvested) * 100;
+                 
+                 // Color coding for profit/loss
+                 const pnlColor = pnl >= 0 ? '\x1b[32m' : '\x1b[31m'; // Green or Red
+                 const resetColor = '\x1b[0m';
+                 
+                 console.log(`\n📊 Position Update #${updateCount}:`);
+                 console.log(`   ⏰ Runtime: ${Math.floor((Date.now() - position.entryTime) / 1000)}s`);
+                 console.log(`   📈 Current Price: ${currentPrice.toFixed(8)} WLD per ${position.token}`);
+                 console.log(`   📊 Average Price: ${position.dipStrategy.averagePrice.toFixed(8)} WLD per ${position.token}`);
+                 console.log(`   💰 Total Investment: ${position.dipStrategy.totalWLDInvested.toFixed(6)} WLD`);
+                 console.log(`   🪙 Total Tokens: ${position.dipStrategy.totalTokensOwned.toFixed(6)} ${position.token}`);
+                 console.log(`   💰 Current Value: ${currentValue.toFixed(6)} WLD`);
+                 console.log(`   ${pnlColor}💹 P&L: ${pnl.toFixed(6)} WLD (${pnlPercent.toFixed(2)}%)${resetColor}`);
+                 
+                 if (pnl >= 0) {
+                     console.log(`   ✅ STATUS: IN PROFIT 📈`);
+                 } else {
+                     console.log(`   ❌ STATUS: IN LOSS 📉`);
+                 }
+                 
+                 // Check for DIP buying opportunity
+                 await this.checkDipBuyingOpportunity(position, currentPrice);
+                 
+                 // Stop tracking after maxUpdates
+                 if (updateCount >= maxUpdates) {
+                     clearInterval(trackingInterval);
+                     console.log(`\n⏰ Tracking completed (${maxUpdates} updates)`);
+                     await this.showFinalResults(position, { 
+                         currentPrice, 
+                         currentValue, 
+                         pnl, 
+                         pnlPercent,
+                         averagePrice: position.dipStrategy.averagePrice,
+                         totalInvestment: position.dipStrategy.totalWLDInvested,
+                         totalTokens: position.dipStrategy.totalTokensOwned,
+                         dipBuysCount: position.dipStrategy.dipBuysCount
+                     });
+                 }
+                 
+             } catch (error) {
+                 console.log(`❌ Tracking error: ${error.message}`);
+             }
+         }, 5000); // Update every 5 seconds
+         
+         // Allow user to stop tracking early
+         setTimeout(async () => {
+             console.log('\n⏹️  Press Enter to stop tracking and return to commands...');
+             const stopChoice = await this.getUserInput('');
+             clearInterval(trackingInterval);
+             console.log(`\n🛑 Position tracking stopped by user`);
+         }, 3000);
+     }
+     
+     // Check for DIP buying opportunities and execute averaging strategy
+     async checkDipBuyingOpportunity(position, currentPrice) {
+         const dipStrategy = position.dipStrategy;
+         
+         // Don't buy if we've reached max DIP buys
+         if (dipStrategy.dipBuysCount >= dipStrategy.maxDipBuys) {
+             return;
+         }
+         
+         // Don't buy if we just made a DIP buy (wait at least 30 seconds)
+         if (dipStrategy.lastDipBuy && (Date.now() - dipStrategy.lastDipBuy) < 30000) {
+             return;
+         }
+         
+         // Need at least 5 price points for DIP detection
+         if (dipStrategy.priceHistory.length < 5) {
+             return;
+         }
+         
+         // Find the highest price in recent history (last 10 data points)
+         const recentPrices = dipStrategy.priceHistory.slice(-10);
+         const highestRecentPrice = Math.max(...recentPrices.map(p => p.price));
+         
+         // Calculate price drop from recent high
+         const priceDrop = ((highestRecentPrice - currentPrice) / highestRecentPrice) * 100;
+         
+         // Check if we're in profit overall (current price vs average price)
+         const overallProfitPercent = ((currentPrice - dipStrategy.averagePrice) / dipStrategy.averagePrice) * 100;
+         
+         if (priceDrop >= dipStrategy.dipThreshold && overallProfitPercent > 0) {
+             console.log(`\n🚨 DIP DETECTED - EXECUTING AVERAGING STRATEGY!`);
+             console.log(`   📉 Price Drop: ${priceDrop.toFixed(2)}% (from ${highestRecentPrice.toFixed(8)} to ${currentPrice.toFixed(8)})`);
+             console.log(`   📈 Overall Profit: ${overallProfitPercent.toFixed(2)}% (above average price)`);
+             console.log(`   🎯 DIP Buy #${dipStrategy.dipBuysCount + 1}/${dipStrategy.maxDipBuys}`);
+             
+             await this.executeDipAveraging(position, currentPrice);
+         }
+     }
+     
+     // Execute DIP averaging buy
+     async executeDipAveraging(position, currentPrice) {
+         try {
+             const dipStrategy = position.dipStrategy;
+             
+             // Calculate DIP buy amount (percentage of original investment)
+             const dipBuyPercent = 0.3; // 30% of original investment
+             const dipBuyAmount = position.amountIn * dipBuyPercent;
+             
+             console.log(`🚀 Executing DIP Averaging Buy:`);
+             console.log(`   💰 DIP Buy Amount: ${dipBuyAmount.toFixed(6)} WLD`);
+             console.log(`   📈 Expected Price: ${currentPrice.toFixed(8)} WLD per ${position.token}`);
+             
+             // Get wallet object
+             const wallet = this.wallets.find(w => w.address === position.wallet) || this.wallets[0];
+             
+             // Execute the DIP buy
+             const result = await this.sinclaveEngine.executeOptimizedSwap(
+                 wallet,
+                 this.WLD_ADDRESS,
+                 position.tokenAddress,
+                 dipBuyAmount,
+                 2 // 2% slippage
+             );
+             
+             if (result.success) {
+                 const tokensReceived = parseFloat(result.amountOut);
+                 const actualPrice = dipBuyAmount / tokensReceived;
+                 
+                 // Update position with new average
+                 const oldTotalWLD = dipStrategy.totalWLDInvested;
+                 const oldTotalTokens = dipStrategy.totalTokensOwned;
+                 const oldAveragePrice = dipStrategy.averagePrice;
+                 
+                 dipStrategy.totalWLDInvested += dipBuyAmount;
+                 dipStrategy.totalTokensOwned += tokensReceived;
+                 dipStrategy.averagePrice = dipStrategy.totalWLDInvested / dipStrategy.totalTokensOwned;
+                 dipStrategy.dipBuysCount++;
+                 dipStrategy.lastDipBuy = Date.now();
+                 
+                 console.log(`✅ DIP AVERAGING SUCCESSFUL!`);
+                 console.log(`   📈 Tokens Received: ${tokensReceived.toFixed(6)} ${position.token}`);
+                 console.log(`   💰 Actual Price: ${actualPrice.toFixed(8)} WLD per ${position.token}`);
+                 console.log(`   🧾 TX Hash: ${result.txHash}`);
+                 console.log(`\n📊 POSITION UPDATED:`);
+                 console.log(`   📊 Old Average: ${oldAveragePrice.toFixed(8)} WLD per ${position.token}`);
+                 console.log(`   📊 New Average: ${dipStrategy.averagePrice.toFixed(8)} WLD per ${position.token}`);
+                 console.log(`   💰 Total Investment: ${dipStrategy.totalWLDInvested.toFixed(6)} WLD (+${dipBuyAmount.toFixed(6)})`);
+                 console.log(`   🪙 Total Tokens: ${dipStrategy.totalTokensOwned.toFixed(6)} ${position.token} (+${tokensReceived.toFixed(6)})`);
+                 console.log(`   🎯 DIP Buys Used: ${dipStrategy.dipBuysCount}/${dipStrategy.maxDipBuys}`);
+                 
+                 // Calculate improvement
+                 const averageImprovement = ((oldAveragePrice - dipStrategy.averagePrice) / oldAveragePrice) * 100;
+                 console.log(`   📈 Average Price Improved by: ${averageImprovement.toFixed(2)}%`);
+                 
+             } else {
+                 console.log(`❌ DIP AVERAGING FAILED: ${result.error}`);
+             }
+             
+         } catch (error) {
+             console.log(`❌ DIP averaging error: ${error.message}`);
+         }
+     }
 
-    // Show final results
-    async showFinalResults(position, currentData = null) {
-        console.log(`\n🏁 FINAL POSITION RESULTS`);
-        console.log('═'.repeat(80));
-        
-        if (position.type.includes('sell')) {
-            // Sell trade - show immediate results
-            console.log(`✅ TRADE COMPLETED SUCCESSFULLY`);
-            console.log(`   📉 Sold: ${position.amountIn} ${position.token}`);
-            console.log(`   💰 Received: ${position.amountOut} WLD`);
-            console.log(`   📈 Exit Price: ${position.exitPrice.toFixed(8)} WLD per ${position.token}`);
-            console.log(`   🧾 Transaction: ${position.txHash}`);
-        } else if (currentData) {
-            // Buy trade with tracking data
-            const pnlColor = currentData.pnl >= 0 ? '\x1b[32m' : '\x1b[31m';
-            const resetColor = '\x1b[0m';
-            const statusIcon = currentData.pnl >= 0 ? '✅' : '❌';
-            const statusText = currentData.pnl >= 0 ? 'PROFITABLE' : 'IN LOSS';
-            
-            console.log(`${statusIcon} POSITION STATUS: ${statusText}`);
-            console.log(`   💰 Initial Investment: ${position.initialValue.toFixed(6)} WLD`);
-            console.log(`   📈 Current Value: ${currentData.currentValue.toFixed(6)} WLD`);
-            console.log(`   ${pnlColor}💹 Final P&L: ${currentData.pnl.toFixed(6)} WLD (${currentData.pnlPercent.toFixed(2)}%)${resetColor}`);
-            console.log(`   ⏱️  Total Runtime: ${Math.floor((Date.now() - position.entryTime) / 1000)}s`);
-        }
-        
-        console.log('═'.repeat(80));
-        await this.getUserInput('Press Enter to continue...');
-    }
+         // Show final results with DIP averaging details
+     async showFinalResults(position, currentData = null) {
+         console.log(`\n🏁 FINAL POSITION RESULTS`);
+         console.log('═'.repeat(80));
+         
+         if (position.type.includes('sell')) {
+             // Sell trade - show immediate results
+             console.log(`✅ TRADE COMPLETED SUCCESSFULLY`);
+             console.log(`   📉 Sold: ${position.amountIn} ${position.token}`);
+             console.log(`   💰 Received: ${position.amountOut} WLD`);
+             console.log(`   📈 Exit Price: ${position.exitPrice.toFixed(8)} WLD per ${position.token}`);
+             console.log(`   🧾 Transaction: ${position.txHash}`);
+         } else if (currentData) {
+             // Buy trade with tracking data and DIP averaging
+             const pnlColor = currentData.pnl >= 0 ? '\x1b[32m' : '\x1b[31m';
+             const resetColor = '\x1b[0m';
+             const statusIcon = currentData.pnl >= 0 ? '✅' : '❌';
+             const statusText = currentData.pnl >= 0 ? 'PROFITABLE' : 'IN LOSS';
+             
+             console.log(`${statusIcon} FINAL POSITION STATUS: ${statusText}`);
+             console.log(`   ⏱️  Total Runtime: ${Math.floor((Date.now() - position.entryTime) / 1000)}s`);
+             console.log(`   📊 Current Price: ${currentData.currentPrice.toFixed(8)} WLD per ${position.token}`);
+             
+             if (position.dipStrategy && currentData.dipBuysCount > 0) {
+                 // Show DIP averaging results
+                 console.log(`\n📊 DIP AVERAGING STRATEGY RESULTS:`);
+                 console.log(`   📈 Original Entry Price: ${position.entryPrice.toFixed(8)} WLD per ${position.token}`);
+                 console.log(`   📊 Final Average Price: ${currentData.averagePrice.toFixed(8)} WLD per ${position.token}`);
+                 
+                 const averageImprovement = ((position.entryPrice - currentData.averagePrice) / position.entryPrice) * 100;
+                 const improvementColor = averageImprovement > 0 ? '\x1b[32m' : '\x1b[31m';
+                 console.log(`   ${improvementColor}📈 Average Price Improved: ${averageImprovement.toFixed(2)}%${resetColor}`);
+                 
+                 console.log(`   🎯 DIP Buys Executed: ${currentData.dipBuysCount}/3`);
+                 console.log(`   💰 Original Investment: ${position.amountIn.toFixed(6)} WLD`);
+                 console.log(`   💰 Total Investment: ${currentData.totalInvestment.toFixed(6)} WLD (+${(currentData.totalInvestment - position.amountIn).toFixed(6)})`);
+                 console.log(`   🪙 Original Tokens: ${position.amountOut.toFixed(6)} ${position.token}`);
+                 console.log(`   🪙 Total Tokens: ${currentData.totalTokens.toFixed(6)} ${position.token} (+${(currentData.totalTokens - position.amountOut).toFixed(6)})`);
+             } else {
+                 // No DIP averaging occurred
+                 console.log(`\n📊 SIMPLE POSITION (No DIP Averaging):`);
+                 console.log(`   📈 Entry Price: ${position.entryPrice.toFixed(8)} WLD per ${position.token}`);
+                 console.log(`   💰 Investment: ${position.initialValue.toFixed(6)} WLD`);
+                 console.log(`   🪙 Tokens: ${position.amountOut.toFixed(6)} ${position.token}`);
+             }
+             
+             console.log(`\n💹 FINAL P&L CALCULATION:`);
+             console.log(`   📈 Current Value: ${currentData.currentValue.toFixed(6)} WLD`);
+             console.log(`   💰 Total Invested: ${currentData.totalInvestment ? currentData.totalInvestment.toFixed(6) : position.initialValue.toFixed(6)} WLD`);
+             console.log(`   ${pnlColor}💹 Final P&L: ${currentData.pnl.toFixed(6)} WLD (${currentData.pnlPercent.toFixed(2)}%)${resetColor}`);
+             
+             if (currentData.pnl >= 0) {
+                 console.log(`\n🎉 CONGRATULATIONS! Your position finished in PROFIT! 📈`);
+             } else {
+                 console.log(`\n📉 Position finished in LOSS. Consider DIP averaging strategies for better results.`);
+             }
+             
+             // Show strategy effectiveness
+             if (position.dipStrategy && currentData.dipBuysCount > 0) {
+                 const originalValue = position.amountOut * currentData.currentPrice;
+                 const originalPnL = originalValue - position.amountIn;
+                 const originalPnLPercent = (originalPnL / position.amountIn) * 100;
+                 
+                 console.log(`\n📊 STRATEGY EFFECTIVENESS:`);
+                 console.log(`   📊 Without DIP Averaging: ${originalPnL.toFixed(6)} WLD (${originalPnLPercent.toFixed(2)}%)`);
+                 console.log(`   📊 With DIP Averaging: ${currentData.pnl.toFixed(6)} WLD (${currentData.pnlPercent.toFixed(2)}%)`);
+                 
+                 const strategyImprovement = currentData.pnl - originalPnL;
+                 const strategyColor = strategyImprovement >= 0 ? '\x1b[32m' : '\x1b[31m';
+                 console.log(`   ${strategyColor}🎯 Strategy Improvement: ${strategyImprovement.toFixed(6)} WLD${resetColor}`);
+             }
+         }
+         
+         console.log('═'.repeat(80));
+         await this.getUserInput('Press Enter to continue...');
+     }
 
     // Helper method to select wallet for trading
     async selectWalletForTrade() {
