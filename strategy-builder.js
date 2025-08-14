@@ -74,8 +74,15 @@ class StrategyBuilder extends EventEmitter {
             
             // Strategy state
             isActive: false,
+            autoSellEnabled: true, // Always enable auto-sell by default
+            autoSellMode: 'aggressive', // 'conservative', 'normal', 'aggressive'
             createdAt: Date.now(),
             lastExecuted: null,
+            
+            // Auto-sell tracking
+            priceAboveAverageCount: 0, // Count how long price stays above average
+            priceAboveAverageThreshold: 5, // Auto-sell after 5 consecutive checks above average
+            lastPriceCheck: 0,
             
             // Performance tracking
             totalTrades: 0,
