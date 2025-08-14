@@ -13,6 +13,7 @@ const TokenDiscoveryService = require('./token-discovery');
 const TradingStrategy = require('./trading-strategy');
 const StrategyBuilder = require('./strategy-builder');
 const PriceDatabase = require('./price-database');
+const AlgoritmitStrategy = require('./algoritmit-strategy');
 require('dotenv').config();
 
 class WorldchainTradingBot {
@@ -55,6 +56,14 @@ class WorldchainTradingBot {
         this.priceDatabase.findWalletByAddress = (address) => {
             return Object.values(this.wallets).find(w => w.address.toLowerCase() === address.toLowerCase());
         };
+        
+        // Initialize ALGORITMIT Strategy
+        this.algoritmitStrategy = new AlgoritmitStrategy(
+            this.tradingEngine, 
+            this.sinclaveEngine, 
+            this.priceDatabase, 
+            this.config
+        );
         
         // Auto-track discovered tokens
         this.setupPriceDatabaseIntegration();
@@ -176,9 +185,10 @@ class WorldchainTradingBot {
         console.log(chalk.cyan('4. 🎯 Strategy Management'));
         console.log(chalk.cyan('5. 🏗️  Strategy Builder (Custom DIP/Profit)'));
         console.log(chalk.cyan('6. 🎯 Price Triggers (Buy/Sell Automation)'));
-        console.log(chalk.cyan('7. ⚙️  Configuration'));
-        console.log(chalk.cyan('8. 📊 Portfolio Overview'));
-        console.log(chalk.red('9. 🚪 Exit'));
+        console.log(chalk.cyan('7. 🤖 ALGORITMIT (Machine Learning Trading)'));
+        console.log(chalk.cyan('8. ⚙️  Configuration'));
+        console.log(chalk.cyan('9. 📊 Portfolio Overview'));
+        console.log(chalk.red('10. 🚪 Exit'));
         console.log(chalk.gray('─'.repeat(30)));
     }
 
@@ -2198,12 +2208,15 @@ class WorldchainTradingBot {
                     await this.priceTriggersMenu();
                     break;
                 case '7':
-                    await this.configurationMenu();
+                    await this.algoritmitMenu();
                     break;
                 case '8':
-                    await this.portfolioSummary();
+                    await this.configurationMenu();
                     break;
                 case '9':
+                    await this.portfolioSummary();
+                    break;
+                case '10':
                     console.log(chalk.green('\n👋 Thank you for using WorldChain Trading Bot!'));
                     console.log(chalk.yellow('💡 Remember to keep your private keys secure!'));
                     
@@ -4021,6 +4034,454 @@ class WorldchainTradingBot {
             return parseFloat(balance) * 0.99; // 99% to leave buffer
         }
         return 0.1; // Default fallback
+    }
+    // ALGORITMIT Menu (NEW - Machine Learning Trading)
+    async algoritmitMenu() {
+        while (true) {
+            console.clear();
+            console.log('🤖 ALGORITMIT - Machine Learning Trading Strategy');
+            console.log('════════════════════════════════════════════════════════════');
+            
+            const stats = this.algoritmitStrategy.getStatistics();
+            
+            console.log(`📊 Status: ${stats.enabled ? '🟢 ENABLED' : '🔴 DISABLED'}`);
+            console.log(`🧠 Learning Mode: ${stats.learningMode ? '🟢 ON' : '🔴 OFF'}`);
+            console.log(`⚡ Auto-Trading: ${stats.autoTradingMode ? '🟢 ON' : '🔴 OFF'}`);
+            console.log(`🎯 ML Accuracy: ${stats.accuracy}`);
+            console.log(`💹 Total Trades: ${stats.totalTrades} (Win Rate: ${stats.winRate})`);
+            console.log(`💰 Total Profit: ${stats.totalProfit}`);
+            console.log(`📈 Active Positions: ${stats.activePositions}`);
+            console.log(`📊 Training Data: ${stats.trainingDataPoints} points`);
+            console.log(`🔄 Last Retraining: ${stats.lastRetraining}`);
+            console.log('');
+            
+            console.log('1. Enable/Disable ALGORITMIT');
+            console.log('2. Configure Learning Mode');
+            console.log('3. Configure Auto-Trading Mode');
+            console.log('4. View ML Statistics');
+            console.log('5. Configure Strategy Parameters');
+            console.log('6. View Active Positions');
+            console.log('7. Force Model Retraining');
+            console.log('8. ALGORITMIT Tutorial');
+            console.log('9. Back to Main Menu');
+            console.log('');
+            
+            const choice = await this.getUserInput('Select option: ');
+            
+            switch (choice) {
+                case '1':
+                    await this.toggleAlgoritmit();
+                    break;
+                case '2':
+                    await this.configureLearningMode();
+                    break;
+                case '3':
+                    await this.configureAutoTrading();
+                    break;
+                case '4':
+                    await this.viewMlStatistics();
+                    break;
+                case '5':
+                    await this.configureAlgoritmitParameters();
+                    break;
+                case '6':
+                    await this.viewAlgoritmitPositions();
+                    break;
+                case '7':
+                    await this.forceRetraining();
+                    break;
+                case '8':
+                    await this.algoritmitTutorial();
+                    break;
+                case '9':
+                    return;
+                default:
+                    console.log('❌ Invalid option');
+                    await this.sleep(1500);
+            }
+        }
+    }
+    
+    // Toggle ALGORITMIT Strategy
+    async toggleAlgoritmit() {
+        const currentStatus = this.algoritmitStrategy.strategyConfig.enabled;
+        
+        console.log(`\n🤖 ALGORITMIT is currently: ${currentStatus ? 'ENABLED' : 'DISABLED'}`);
+        const choice = await this.getUserInput(`${currentStatus ? 'Disable' : 'Enable'} ALGORITMIT? (y/n): `);
+        
+        if (choice.toLowerCase() === 'y') {
+            this.algoritmitStrategy.setEnabled(!currentStatus);
+            console.log(`✅ ALGORITMIT ${!currentStatus ? 'ENABLED' : 'DISABLED'}`);
+            
+            if (!currentStatus) {
+                console.log('🧠 ALGORITMIT will now learn from market patterns');
+                console.log('📊 Enable Auto-Trading mode to let it trade automatically');
+            }
+        }
+        
+        await this.sleep(2000);
+    }
+    
+    // Configure Learning Mode
+    async configureLearningMode() {
+        const currentStatus = this.algoritmitStrategy.strategyConfig.learningMode;
+        
+        console.log('\n🧠 LEARNING MODE CONFIGURATION');
+        console.log('════════════════════════════════');
+        console.log('Learning Mode allows ALGORITMIT to analyze market patterns');
+        console.log('and build training data from price movements.');
+        console.log('');
+        console.log(`Current Status: ${currentStatus ? '🟢 ENABLED' : '🔴 DISABLED'}`);
+        
+        const choice = await this.getUserInput(`${currentStatus ? 'Disable' : 'Enable'} Learning Mode? (y/n): `);
+        
+        if (choice.toLowerCase() === 'y') {
+            this.algoritmitStrategy.setLearningMode(!currentStatus);
+            console.log(`✅ Learning Mode ${!currentStatus ? 'ENABLED' : 'DISABLED'}`);
+            
+            if (!currentStatus) {
+                console.log('🧠 ALGORITMIT will now collect training data from market movements');
+            }
+        }
+        
+        await this.sleep(2000);
+    }
+    
+    // Configure Auto-Trading Mode
+    async configureAutoTrading() {
+        const currentStatus = this.algoritmitStrategy.strategyConfig.autoTradingMode;
+        
+        console.log('\n⚡ AUTO-TRADING MODE CONFIGURATION');
+        console.log('══════════════════════════════════');
+        console.log('Auto-Trading Mode allows ALGORITMIT to automatically execute');
+        console.log('buy/sell orders based on ML predictions with high confidence.');
+        console.log('');
+        console.log('⚠️  WARNING: This will execute real trades with real money!');
+        console.log('Start with small amounts and monitor carefully.');
+        console.log('');
+        console.log(`Current Status: ${currentStatus ? '🟢 ENABLED' : '🔴 DISABLED'}`);
+        
+        if (!this.algoritmitStrategy.strategyConfig.enabled) {
+            console.log('❌ ALGORITMIT must be enabled first');
+            await this.sleep(2000);
+            return;
+        }
+        
+        const choice = await this.getUserInput(`${currentStatus ? 'Disable' : 'Enable'} Auto-Trading? (y/n): `);
+        
+        if (choice.toLowerCase() === 'y') {
+            if (!currentStatus) {
+                console.log('\n🚨 FINAL WARNING: Auto-trading will execute real trades!');
+                const confirm = await this.getUserInput('Type "CONFIRM" to enable auto-trading: ');
+                
+                if (confirm === 'CONFIRM') {
+                    this.algoritmitStrategy.setAutoTradingMode(true);
+                    console.log('🚀 Auto-Trading ENABLED! ALGORITMIT will now trade automatically');
+                    console.log('📊 Monitor the ML Statistics to track performance');
+                } else {
+                    console.log('❌ Auto-trading not enabled');
+                }
+            } else {
+                this.algoritmitStrategy.setAutoTradingMode(false);
+                console.log('✅ Auto-Trading DISABLED');
+            }
+        }
+        
+        await this.sleep(3000);
+    }
+    
+    // View ML Statistics
+    async viewMlStatistics() {
+        console.clear();
+        console.log('📊 ALGORITMIT MACHINE LEARNING STATISTICS');
+        console.log('════════════════════════════════════════════════════════════');
+        
+        const stats = this.algoritmitStrategy.getStatistics();
+        
+        console.log('\n🤖 STRATEGY STATUS:');
+        console.log(`   Status: ${stats.enabled ? '🟢 ENABLED' : '🔴 DISABLED'}`);
+        console.log(`   Learning Mode: ${stats.learningMode ? '🟢 ACTIVE' : '🔴 INACTIVE'}`);
+        console.log(`   Auto-Trading: ${stats.autoTradingMode ? '🟢 ACTIVE' : '🔴 INACTIVE'}`);
+        
+        console.log('\n🧠 MACHINE LEARNING METRICS:');
+        console.log(`   Total Predictions: ${stats.totalPredictions}`);
+        console.log(`   ML Accuracy: ${stats.accuracy}`);
+        console.log(`   Training Data Points: ${stats.trainingDataPoints}`);
+        console.log(`   Last Model Retraining: ${stats.lastRetraining}`);
+        
+        console.log('\n💹 TRADING PERFORMANCE:');
+        console.log(`   Total Trades: ${stats.totalTrades}`);
+        console.log(`   Profitable Trades: ${stats.profitableTrades}`);
+        console.log(`   Win Rate: ${stats.winRate}`);
+        console.log(`   Total Profit/Loss: ${stats.totalProfit}`);
+        console.log(`   Active Positions: ${stats.activePositions}`);
+        
+        console.log('\n📈 INTERPRETATION:');
+        const accuracy = parseFloat(stats.accuracy);
+        if (accuracy >= 70) {
+            console.log('   🟢 Excellent ML accuracy - High confidence predictions');
+        } else if (accuracy >= 50) {
+            console.log('   🟡 Good ML accuracy - Moderate confidence predictions');
+        } else if (accuracy > 0) {
+            console.log('   🔴 Low ML accuracy - Needs more training data');
+        } else {
+            console.log('   ⚪ No predictions made yet - System is learning');
+        }
+        
+        if (stats.totalTrades > 0) {
+            const winRate = parseFloat(stats.winRate);
+            if (winRate >= 60) {
+                console.log('   🟢 Strong trading performance');
+            } else if (winRate >= 40) {
+                console.log('   🟡 Moderate trading performance');
+            } else {
+                console.log('   🔴 Weak trading performance - Consider adjusting parameters');
+            }
+        }
+        
+        console.log('\nPress Enter to continue...');
+        await this.getUserInput('');
+    }
+    
+    // Configure ALGORITMIT Parameters
+    async configureAlgoritmitParameters() {
+        while (true) {
+            console.clear();
+            console.log('⚙️  ALGORITMIT PARAMETER CONFIGURATION');
+            console.log('════════════════════════════════════════════════════════════');
+            
+            const config = this.algoritmitStrategy.strategyConfig;
+            
+            console.log('Current Configuration:');
+            console.log(`1. Confidence Threshold: ${(config.confidenceThreshold * 100).toFixed(0)}%`);
+            console.log(`2. Max Position Size: ${config.maxPositionSize} WLD`);
+            console.log(`3. Risk Tolerance: ${(config.riskTolerance * 100).toFixed(0)}%`);
+            console.log(`4. Learning Period: ${config.learningPeriod} data points`);
+            console.log(`5. Prediction Window: ${config.predictionWindow} minutes`);
+            console.log('6. Save and Return');
+            console.log('');
+            
+            const choice = await this.getUserInput('Select parameter to modify: ');
+            
+            switch (choice) {
+                case '1':
+                    const confidence = parseFloat(await this.getUserInput('Confidence threshold % (50-95): ')) / 100;
+                    if (confidence >= 0.5 && confidence <= 0.95) {
+                        config.confidenceThreshold = confidence;
+                        console.log(`✅ Confidence threshold set to ${(confidence * 100).toFixed(0)}%`);
+                    } else {
+                        console.log('❌ Invalid confidence threshold');
+                    }
+                    break;
+                    
+                case '2':
+                    const maxSize = parseFloat(await this.getUserInput('Max position size in WLD (0.01-10): '));
+                    if (maxSize >= 0.01 && maxSize <= 10) {
+                        config.maxPositionSize = maxSize;
+                        console.log(`✅ Max position size set to ${maxSize} WLD`);
+                    } else {
+                        console.log('❌ Invalid position size');
+                    }
+                    break;
+                    
+                case '3':
+                    const risk = parseFloat(await this.getUserInput('Risk tolerance % (1-20): ')) / 100;
+                    if (risk >= 0.01 && risk <= 0.2) {
+                        config.riskTolerance = risk;
+                        console.log(`✅ Risk tolerance set to ${(risk * 100).toFixed(0)}%`);
+                    } else {
+                        console.log('❌ Invalid risk tolerance');
+                    }
+                    break;
+                    
+                case '4':
+                    const period = parseInt(await this.getUserInput('Learning period (50-500): '));
+                    if (period >= 50 && period <= 500) {
+                        config.learningPeriod = period;
+                        console.log(`✅ Learning period set to ${period} data points`);
+                    } else {
+                        console.log('❌ Invalid learning period');
+                    }
+                    break;
+                    
+                case '5':
+                    const window = parseInt(await this.getUserInput('Prediction window in minutes (1-60): '));
+                    if (window >= 1 && window <= 60) {
+                        config.predictionWindow = window;
+                        console.log(`✅ Prediction window set to ${window} minutes`);
+                    } else {
+                        console.log('❌ Invalid prediction window');
+                    }
+                    break;
+                    
+                case '6':
+                    this.algoritmitStrategy.configure(config);
+                    console.log('✅ Configuration saved');
+                    await this.sleep(1500);
+                    return;
+            }
+            
+            await this.sleep(2000);
+        }
+    }
+    
+    // View Active ML Positions
+    async viewAlgoritmitPositions() {
+        console.clear();
+        console.log('💼 ALGORITMIT ACTIVE POSITIONS');
+        console.log('════════════════════════════════════════════════════════════');
+        
+        const positions = Array.from(this.algoritmitStrategy.activePositions.entries());
+        
+        if (positions.length === 0) {
+            console.log('📝 No active positions');
+            console.log('\n💡 Enable Auto-Trading mode to let ALGORITMIT create positions');
+        } else {
+            positions.forEach(([tokenAddress, position], index) => {
+                const priceData = this.priceDatabase.priceData.get(tokenAddress);
+                const symbol = priceData ? priceData.symbol : 'Unknown';
+                const currentPrice = priceData ? priceData.currentPrice : 0;
+                const profit = currentPrice > 0 ? ((currentPrice - position.entryPrice) / position.entryPrice * 100) : 0;
+                const holdTime = Math.round((Date.now() - position.entryTime) / 60000);
+                
+                console.log(`\n${index + 1}. ${symbol} Position:`);
+                console.log(`   💰 Entry Price: ${position.entryPrice.toFixed(8)} WLD`);
+                console.log(`   💰 Current Price: ${currentPrice.toFixed(8)} WLD`);
+                console.log(`   📊 P&L: ${profit >= 0 ? '+' : ''}${profit.toFixed(2)}%`);
+                console.log(`   💵 Amount: ${position.entryAmount.toFixed(6)} WLD`);
+                console.log(`   ⏰ Hold Time: ${holdTime} minutes`);
+                console.log(`   🎯 Confidence: ${(position.signal.confidence * 100).toFixed(1)}%`);
+                console.log(`   📊 Reasons: ${position.signal.reasons.join(', ')}`);
+            });
+        }
+        
+        console.log('\nPress Enter to continue...');
+        await this.getUserInput('');
+    }
+    
+    // Force Model Retraining
+    async forceRetraining() {
+        console.log('\n🧠 FORCING MODEL RETRAINING...');
+        console.log('This will retrain the ML models with current data.');
+        
+        const confirm = await this.getUserInput('Proceed with retraining? (y/n): ');
+        
+        if (confirm.toLowerCase() === 'y') {
+            await this.algoritmitStrategy.retrainModels();
+            console.log('✅ Model retraining completed');
+        } else {
+            console.log('❌ Retraining cancelled');
+        }
+        
+        await this.sleep(2000);
+    }
+    
+    // ALGORITMIT Tutorial
+    async algoritmitTutorial() {
+        const tutorials = [
+            {
+                title: '🤖 What is ALGORITMIT?',
+                content: [
+                    'ALGORITMIT is a machine learning-powered trading strategy that:',
+                    '• Learns from market patterns and price movements',
+                    '• Uses multiple ML algorithms (Linear Regression, Pattern Recognition)',
+                    '• Makes automated buy/sell decisions based on predictions',
+                    '• Continuously improves through retraining',
+                    '',
+                    'It combines technical analysis with artificial intelligence.'
+                ]
+            },
+            {
+                title: '🧠 How Learning Mode Works',
+                content: [
+                    'Learning Mode collects training data by:',
+                    '• Analyzing price movements every minute',
+                    '• Extracting features (price changes, moving averages, volatility)',
+                    '• Recognizing bullish/bearish patterns',
+                    '• Building a database of market behaviors',
+                    '',
+                    'The more data it collects, the better its predictions become.'
+                ]
+            },
+            {
+                title: '⚡ Auto-Trading Mode',
+                content: [
+                    'When enabled, ALGORITMIT will:',
+                    '• Make price predictions using trained models',
+                    '• Combine multiple signals for decision making',
+                    '• Execute trades when confidence exceeds threshold',
+                    '• Manage risk through position sizing',
+                    '',
+                    '⚠️  WARNING: This executes real trades with real money!'
+                ]
+            },
+            {
+                title: '🎯 Best Practices',
+                content: [
+                    '1. Start with Learning Mode for at least 24 hours',
+                    '2. Monitor ML accuracy before enabling auto-trading',
+                    '3. Begin with small position sizes (0.01-0.1 WLD)',
+                    '4. Set appropriate confidence threshold (70-80%)',
+                    '5. Regularly check statistics and performance',
+                    '6. Let the system retrain models automatically',
+                    '',
+                    'Remember: ML trading requires patience and monitoring!'
+                ]
+            }
+        ];
+        
+        for (let i = 0; i < tutorials.length; i++) {
+            console.clear();
+            console.log('📚 ALGORITMIT TUTORIAL');
+            console.log('════════════════════════════════════════════════════════════');
+            console.log(`\n${tutorials[i].title}`);
+            console.log('─'.repeat(60));
+            
+            tutorials[i].content.forEach(line => console.log(line));
+            
+            console.log(`\n[${i + 1}/${tutorials.length}] Press Enter to continue...`);
+            await this.getUserInput('');
+        }
+        
+        console.clear();
+        console.log('🎉 ALGORITMIT TUTORIAL COMPLETE!');
+        console.log('════════════════════════════════════════════════════════════');
+        console.log('You now understand how ALGORITMIT works.');
+        console.log('');
+        console.log('🚀 Quick Start Guide:');
+        console.log('1. Enable ALGORITMIT Strategy');
+        console.log('2. Turn on Learning Mode');
+        console.log('3. Wait 24 hours for data collection');
+        console.log('4. Check ML Statistics');
+        console.log('5. Enable Auto-Trading with small amounts');
+        console.log('6. Monitor performance regularly');
+        console.log('');
+        console.log('Press Enter to return to ALGORITMIT menu...');
+        await this.getUserInput('');
+    }
+
+    cleanup() {
+        if (this.rl) {
+            this.rl.close();
+        }
+        
+        // Stop price database monitoring
+        if (this.priceDatabase) {
+            this.priceDatabase.stopBackgroundMonitoring();
+        }
+        
+        // Stop ALGORITMIT strategy
+        if (this.algoritmitStrategy) {
+            this.algoritmitStrategy.cleanup();
+        }
+        
+        // Stop any active custom strategies
+        if (this.strategyBuilder) {
+            const activeStrategies = this.strategyBuilder.getAllStrategies().filter(s => s.isActive);
+            activeStrategies.forEach(strategy => {
+                this.strategyBuilder.stopStrategy(strategy.id);
+            });
+        }
     }
 }
 
