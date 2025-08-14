@@ -569,10 +569,13 @@ class TradingStrategy extends EventEmitter {
                 return;
             }
             
-            // Check for stop loss
-            if (unrealizedPnLPercent <= position.stopLoss) {
+            // Check for stop loss (with floating-point tolerance)
+            const stopLossTolerance = 0.01; // 0.01% tolerance for floating-point precision
+            if (unrealizedPnLPercent <= (position.stopLoss + stopLossTolerance)) {
                 console.log(`🛑 STOP LOSS TRIGGERED! ${unrealizedPnLPercent.toFixed(2)}% <= ${position.stopLoss}%`);
                 console.log(`💸 Expected return: ${currentWLDValue.toFixed(6)} WLD (loss: ${Math.abs(unrealizedPnL).toFixed(6)} WLD)`);
+                console.log(`🔍 DEBUG - Entry: ${position.entryAmountWLD.toFixed(6)} WLD, Current: ${currentWLDValue.toFixed(6)} WLD`);
+                console.log(`🔍 DEBUG - Stop Loss Threshold: ${position.stopLoss}%, Actual Loss: ${unrealizedPnLPercent.toFixed(2)}%`);
                 
                 if (canExecuteReverseSwap) {
                     // Check if position is already being sold
@@ -639,6 +642,12 @@ class TradingStrategy extends EventEmitter {
                 
                 console.log(`   🎯 Target: ${position.profitTarget}% | 🛑 Stop: ${position.stopLoss}%`);
                 console.log(`   🔄 Swap Available: ${canExecuteReverseSwap ? '✅' : '❌'}`);
+                
+                // Show stop loss proximity
+                const stopLossDistance = Math.abs(unrealizedPnLPercent - position.stopLoss);
+                if (unrealizedPnLPercent < 0) { // Only show when in loss
+                    console.log(`   🛑 Stop Loss Distance: ${stopLossDistance.toFixed(2)}% (${unrealizedPnLPercent.toFixed(2)}% vs ${position.stopLoss}%)`);
+                }
             }
             
             await this.savePositions();
@@ -659,8 +668,9 @@ class TradingStrategy extends EventEmitter {
             return;
         }
         
-        // Check stop loss
-        if (unrealizedPnLPercent <= this.strategyConfig.stopLossThreshold) {
+        // Check stop loss (with floating-point tolerance)
+        const stopLossTolerance = 0.01; // 0.01% tolerance for floating-point precision
+        if (unrealizedPnLPercent <= (this.strategyConfig.stopLossThreshold + stopLossTolerance)) {
             console.log(`🛑 Stop loss triggered for ${tokenAddress}: ${unrealizedPnLPercent.toFixed(2)}%`);
             await this.executeSellTrade(tokenAddress, 'stop_loss');
             return;
