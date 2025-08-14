@@ -295,6 +295,8 @@ class TradingStrategy extends EventEmitter {
             
             // Use Sinclave Enhanced Engine if available for better execution
             let result;
+            let currentPrice = 0; // Initialize currentPrice to avoid undefined errors
+            
             if (this.sinclaveEngine) {
                 console.log('🚀 Using Sinclave Enhanced Engine for optimal sell execution...');
                 
@@ -313,12 +315,30 @@ class TradingStrategy extends EventEmitter {
                 
                 console.log(`✅ Enhanced sell completed in ${result.executionTime}ms`);
                 
+                // Calculate currentPrice from the executed trade result
+                if (result.amountOut && position.entryAmountToken) {
+                    currentPrice = parseFloat(result.amountOut) / position.entryAmountToken;
+                } else {
+                    // Fallback: get price from quote
+                    try {
+                        currentPrice = await this.getCurrentTokenPrice(tokenAddress);
+                    } catch (error) {
+                        console.log(`⚠️ Could not get current price, using entry price as fallback`);
+                        currentPrice = position.entryPrice || 0;
+                    }
+                }
+                
             } else {
                 // Fallback to standard engine
                 console.log('⚠️ Using standard trading engine for sell (liquidity may be limited)');
                 
                 // Get current price
-                const currentPrice = await this.getCurrentTokenPrice(tokenAddress);
+                try {
+                    currentPrice = await this.getCurrentTokenPrice(tokenAddress);
+                } catch (error) {
+                    console.log(`⚠️ Could not get current price, using entry price as fallback`);
+                    currentPrice = position.entryPrice || 0;
+                }
                 
                 // Execute the sell trade
                 result = await this.tradingEngine.executeSwap(
@@ -426,6 +446,11 @@ class TradingStrategy extends EventEmitter {
         const position = this.positions.get(tokenAddress);
         if (!position || position.status !== 'open') {
             this.stopPositionMonitoring(tokenAddress);
+            return;
+        }
+        
+        // Skip if position is already being processed
+        if (this.positionLocks.get(tokenAddress)) {
             return;
         }
         

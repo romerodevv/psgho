@@ -2179,6 +2179,389 @@ class WorldchainTradingBot {
             }
         }
     }
+
+    // Strategy Builder Menu (NEW - Custom DIP/Profit Strategies)
+    async strategyBuilderMenu() {
+        while (true) {
+            console.clear();
+            console.log('🏗️  STRATEGY BUILDER - Custom DIP/Profit Strategies');
+            console.log('════════════════════════════════════════════════════════════');
+            console.log('1. 📋 View All Custom Strategies');
+            console.log('2. ➕ Create New Strategy');
+            console.log('3. ▶️  Start Strategy');
+            console.log('4. ⏹️  Stop Strategy');
+            console.log('5. 🗑️  Delete Strategy');
+            console.log('6. 📊 Strategy Statistics');
+            console.log('7. 🔙 Back to Main Menu');
+            console.log('────────────────────────────────────────────────────────────');
+
+            const choice = await this.getInput('Select option: ');
+
+            switch (choice) {
+                case '1':
+                    await this.viewCustomStrategies();
+                    break;
+                case '2':
+                    await this.createCustomStrategy();
+                    break;
+                case '3':
+                    await this.startCustomStrategy();
+                    break;
+                case '4':
+                    await this.stopCustomStrategy();
+                    break;
+                case '5':
+                    await this.deleteCustomStrategy();
+                    break;
+                case '6':
+                    await this.viewStrategyStatistics();
+                    break;
+                case '7':
+                    return;
+                default:
+                    console.log('❌ Invalid option. Please try again.');
+                    await this.getInput('Press Enter to continue...');
+            }
+        }
+    }
+
+    // View all custom strategies
+    async viewCustomStrategies() {
+        console.clear();
+        console.log('📋 CUSTOM STRATEGIES');
+        console.log('════════════════════════════════════════════════════════════');
+
+        const strategies = this.strategyBuilder.getAllStrategies();
+        
+        if (strategies.length === 0) {
+            console.log('📭 No custom strategies found.');
+            console.log('💡 Create your first strategy to start automated DIP buying and profit taking!');
+        } else {
+            strategies.forEach((strategy, index) => {
+                const isActive = this.strategyBuilder.isStrategyActive(strategy.id);
+                const statusIcon = isActive ? '🟢' : '🔴';
+                const statusText = isActive ? 'ACTIVE' : 'STOPPED';
+                
+                console.log(`\n${index + 1}. ${statusIcon} ${strategy.name} [${statusText}]`);
+                console.log(`   📊 Pair: WLD → ${strategy.targetTokenSymbol || strategy.targetToken}`);
+                console.log(`   📉 DIP Threshold: ${strategy.dipThreshold}%`);
+                console.log(`   📈 Profit Target: ${strategy.profitTarget}%`);
+                console.log(`   💰 Trade Amount: ${strategy.tradeAmount} WLD`);
+                console.log(`   📋 ID: ${strategy.id}`);
+            });
+        }
+
+        await this.getInput('\nPress Enter to continue...');
+    }
+
+    // Create new custom strategy
+    async createCustomStrategy() {
+        console.clear();
+        console.log('➕ CREATE NEW CUSTOM STRATEGY');
+        console.log('════════════════════════════════════════════════════════════');
+
+        try {
+            // Get strategy configuration
+            const name = await this.getInput('Strategy Name: ');
+            if (!name.trim()) {
+                console.log('❌ Strategy name cannot be empty.');
+                await this.getInput('Press Enter to continue...');
+                return;
+            }
+
+            // Show available tokens for selection
+            console.log('\n📋 Available Tokens:');
+            const tokens = Array.from(this.discoveredTokens.entries());
+            
+            if (tokens.length === 0) {
+                console.log('❌ No tokens discovered. Please run Token Discovery first.');
+                await this.getInput('Press Enter to continue...');
+                return;
+            }
+
+            tokens.forEach(([address, token], index) => {
+                console.log(`${index + 1}. ${token.symbol || 'Unknown'} (${address})`);
+            });
+
+            const tokenChoice = await this.getInput('\nSelect target token (number): ');
+            const tokenIndex = parseInt(tokenChoice) - 1;
+            
+            if (tokenIndex < 0 || tokenIndex >= tokens.length) {
+                console.log('❌ Invalid token selection.');
+                await this.getInput('Press Enter to continue...');
+                return;
+            }
+
+            const [targetToken, tokenInfo] = tokens[tokenIndex];
+
+            // Get strategy parameters
+            const dipThreshold = parseFloat(await this.getInput('DIP Threshold % (e.g., 5 for 5% drop): '));
+            const profitTarget = parseFloat(await this.getInput('Profit Target % (e.g., 3 for 3% profit): '));
+            const tradeAmount = parseFloat(await this.getInput('Trade Amount in WLD (e.g., 0.1): '));
+            const maxSlippage = parseFloat(await this.getInput('Max Slippage % (e.g., 1 for 1%): ') || '1');
+
+            // Validation
+            if (isNaN(dipThreshold) || dipThreshold <= 0 || dipThreshold > 50) {
+                console.log('❌ Invalid DIP threshold. Must be between 0.1% and 50%.');
+                await this.getInput('Press Enter to continue...');
+                return;
+            }
+
+            if (isNaN(profitTarget) || profitTarget <= 0 || profitTarget > 100) {
+                console.log('❌ Invalid profit target. Must be between 0.1% and 100%.');
+                await this.getInput('Press Enter to continue...');
+                return;
+            }
+
+            if (isNaN(tradeAmount) || tradeAmount <= 0) {
+                console.log('❌ Invalid trade amount. Must be greater than 0.');
+                await this.getInput('Press Enter to continue...');
+                return;
+            }
+
+            // Create strategy
+            const strategyConfig = {
+                name: name.trim(),
+                baseToken: this.WLD_ADDRESS,
+                targetToken,
+                targetTokenSymbol: tokenInfo.symbol || 'Unknown',
+                dipThreshold,
+                profitTarget,
+                tradeAmount,
+                maxSlippage,
+                priceCheckInterval: 5000, // 5 seconds
+                dipTimeframe: 60000 // 1 minute for DIP detection
+            };
+
+            const strategyId = await this.strategyBuilder.createStrategy(strategyConfig);
+
+            console.log(`\n✅ Custom strategy created successfully!`);
+            console.log(`📋 Strategy ID: ${strategyId}`);
+            console.log(`📊 Name: ${name}`);
+            console.log(`💱 Pair: WLD → ${tokenInfo.symbol || 'Unknown'}`);
+            console.log(`📉 DIP Threshold: ${dipThreshold}%`);
+            console.log(`📈 Profit Target: ${profitTarget}%`);
+            console.log(`💰 Trade Amount: ${tradeAmount} WLD`);
+
+        } catch (error) {
+            console.log(`❌ Error creating strategy: ${error.message}`);
+        }
+
+        await this.getInput('\nPress Enter to continue...');
+    }
+
+    // Start custom strategy
+    async startCustomStrategy() {
+        console.clear();
+        console.log('▶️  START CUSTOM STRATEGY');
+        console.log('════════════════════════════════════════════════════════════');
+
+        const strategies = this.strategyBuilder.getAllStrategies();
+        
+        if (strategies.length === 0) {
+            console.log('📭 No custom strategies found. Create one first!');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        // Show available strategies
+        console.log('📋 Available Strategies:');
+        strategies.forEach((strategy, index) => {
+            const isActive = this.strategyBuilder.isStrategyActive(strategy.id);
+            const statusIcon = isActive ? '🟢 ACTIVE' : '🔴 STOPPED';
+            
+            console.log(`${index + 1}. ${strategy.name} [${statusIcon}]`);
+            console.log(`   📊 Pair: WLD → ${strategy.targetTokenSymbol}`);
+            console.log(`   📋 ID: ${strategy.id}`);
+        });
+
+        const choice = await this.getInput('\nSelect strategy to start (number): ');
+        const strategyIndex = parseInt(choice) - 1;
+        
+        if (strategyIndex < 0 || strategyIndex >= strategies.length) {
+            console.log('❌ Invalid strategy selection.');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        const strategy = strategies[strategyIndex];
+
+        if (this.strategyBuilder.isStrategyActive(strategy.id)) {
+            console.log('⚠️ Strategy is already running!');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        // Select wallet for strategy
+        if (this.wallets.length === 0) {
+            console.log('❌ No wallets available. Add a wallet first!');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        console.log('\n💼 Available Wallets:');
+        this.wallets.forEach((wallet, index) => {
+            console.log(`${index + 1}. ${wallet.name} (${wallet.address})`);
+        });
+
+        const walletChoice = await this.getInput('Select wallet (number): ');
+        const walletIndex = parseInt(walletChoice) - 1;
+        
+        if (walletIndex < 0 || walletIndex >= this.wallets.length) {
+            console.log('❌ Invalid wallet selection.');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        const walletObject = this.wallets[walletIndex];
+
+        try {
+            await this.strategyBuilder.startStrategy(strategy.id, walletObject);
+            console.log(`\n✅ Strategy "${strategy.name}" started successfully!`);
+            console.log(`🔄 Monitoring ${strategy.targetTokenSymbol} for DIP opportunities...`);
+            console.log(`📈 Will sell when profit target of ${strategy.profitTarget}% is reached.`);
+        } catch (error) {
+            console.log(`❌ Error starting strategy: ${error.message}`);
+        }
+
+        await this.getInput('\nPress Enter to continue...');
+    }
+
+    // Stop custom strategy
+    async stopCustomStrategy() {
+        console.clear();
+        console.log('⏹️  STOP CUSTOM STRATEGY');
+        console.log('════════════════════════════════════════════════════════════');
+
+        const activeStrategies = this.strategyBuilder.getAllStrategies().filter(s => 
+            this.strategyBuilder.isStrategyActive(s.id)
+        );
+        
+        if (activeStrategies.length === 0) {
+            console.log('📭 No active strategies found.');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        // Show active strategies
+        console.log('🟢 Active Strategies:');
+        activeStrategies.forEach((strategy, index) => {
+            console.log(`${index + 1}. ${strategy.name}`);
+            console.log(`   📊 Pair: WLD → ${strategy.targetTokenSymbol}`);
+            console.log(`   📋 ID: ${strategy.id}`);
+        });
+
+        const choice = await this.getInput('\nSelect strategy to stop (number): ');
+        const strategyIndex = parseInt(choice) - 1;
+        
+        if (strategyIndex < 0 || strategyIndex >= activeStrategies.length) {
+            console.log('❌ Invalid strategy selection.');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        const strategy = activeStrategies[strategyIndex];
+
+        try {
+            await this.strategyBuilder.stopStrategy(strategy.id);
+            console.log(`\n✅ Strategy "${strategy.name}" stopped successfully!`);
+        } catch (error) {
+            console.log(`❌ Error stopping strategy: ${error.message}`);
+        }
+
+        await this.getInput('\nPress Enter to continue...');
+    }
+
+    // Delete custom strategy
+    async deleteCustomStrategy() {
+        console.clear();
+        console.log('🗑️  DELETE CUSTOM STRATEGY');
+        console.log('════════════════════════════════════════════════════════════');
+
+        const strategies = this.strategyBuilder.getAllStrategies();
+        
+        if (strategies.length === 0) {
+            console.log('📭 No custom strategies found.');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        // Show all strategies
+        console.log('📋 All Strategies:');
+        strategies.forEach((strategy, index) => {
+            const isActive = this.strategyBuilder.isStrategyActive(strategy.id);
+            const statusIcon = isActive ? '🟢 ACTIVE' : '🔴 STOPPED';
+            
+            console.log(`${index + 1}. ${strategy.name} [${statusIcon}]`);
+            console.log(`   📊 Pair: WLD → ${strategy.targetTokenSymbol}`);
+            console.log(`   📋 ID: ${strategy.id}`);
+        });
+
+        const choice = await this.getInput('\nSelect strategy to delete (number): ');
+        const strategyIndex = parseInt(choice) - 1;
+        
+        if (strategyIndex < 0 || strategyIndex >= strategies.length) {
+            console.log('❌ Invalid strategy selection.');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        const strategy = strategies[strategyIndex];
+
+        // Confirm deletion
+        const confirm = await this.getInput(`⚠️ Are you sure you want to delete "${strategy.name}"? (yes/no): `);
+        
+        if (confirm.toLowerCase() !== 'yes') {
+            console.log('❌ Deletion cancelled.');
+            await this.getInput('Press Enter to continue...');
+            return;
+        }
+
+        try {
+            // Stop strategy if active
+            if (this.strategyBuilder.isStrategyActive(strategy.id)) {
+                await this.strategyBuilder.stopStrategy(strategy.id);
+            }
+            
+            await this.strategyBuilder.deleteStrategy(strategy.id);
+            console.log(`\n✅ Strategy "${strategy.name}" deleted successfully!`);
+        } catch (error) {
+            console.log(`❌ Error deleting strategy: ${error.message}`);
+        }
+
+        await this.getInput('\nPress Enter to continue...');
+    }
+
+    // View strategy statistics
+    async viewStrategyStatistics() {
+        console.clear();
+        console.log('📊 CUSTOM STRATEGY STATISTICS');
+        console.log('════════════════════════════════════════════════════════════');
+
+        try {
+            const stats = this.strategyBuilder.getStrategyStatistics();
+            
+            console.log(`📈 Total Strategies: ${stats.totalStrategies}`);
+            console.log(`🟢 Active Strategies: ${stats.activeStrategies}`);
+            console.log(`🔴 Stopped Strategies: ${stats.stoppedStrategies}`);
+            console.log(`💹 Total Trades: ${stats.totalTrades}`);
+            console.log(`✅ Successful Trades: ${stats.successfulTrades}`);
+            console.log(`❌ Failed Trades: ${stats.failedTrades}`);
+            console.log(`📊 Success Rate: ${stats.successRate.toFixed(1)}%`);
+            console.log(`💰 Total Profit: ${stats.totalProfit.toFixed(6)} WLD`);
+            console.log(`📈 Average Profit per Trade: ${stats.averageProfitPerTrade.toFixed(6)} WLD`);
+            
+            if (stats.bestPerformingStrategy) {
+                console.log(`\n🏆 Best Performing Strategy: ${stats.bestPerformingStrategy.name}`);
+                console.log(`   💰 Profit: ${stats.bestPerformingStrategy.profit.toFixed(6)} WLD`);
+            }
+            
+        } catch (error) {
+            console.log(`❌ Error loading statistics: ${error.message}`);
+        }
+
+        await this.getInput('\nPress Enter to continue...');
+    }
 }
 
 // Start the bot
