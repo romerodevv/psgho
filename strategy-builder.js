@@ -902,6 +902,12 @@ class StrategyBuilder extends EventEmitter {
     // Handle sophisticated profit range selling
     async handleProfitRange(strategy, openPositions, currentPrice, averagePrice, totalWLD, totalTokens, unrealizedPnLPercent) {
         try {
+            // Check if strategy is completed (auto-sell executed)
+            if (strategy.status === 'completed' || strategy.autoSellExecuted) {
+                console.log(`✅ Strategy "${strategy.name}" already completed with auto-sell. Stopping monitoring.`);
+                return;
+            }
+            
             // Initialize profit range tracking if not exists
             if (!strategy.profitRangeState) {
                 strategy.profitRangeState = {
@@ -934,59 +940,17 @@ class StrategyBuilder extends EventEmitter {
             console.log(`   📈 Current Value: ${(totalTokens * currentPrice).toFixed(6)} WLD`);
             console.log(`   💹 Unrealized P&L: ${unrealizedPnLPercent.toFixed(2)}%`);
             
-            // Check if we're in the profit range
+            // Check if we're in the profit range - AUTO-SELL IMMEDIATELY when profit range is reached
             if (currentPrice >= minPrice) {
-                console.log(`🎯 ENTERED PROFIT RANGE for ${strategy.name}!`);
+                console.log(`🎯 PROFIT RANGE REACHED for ${strategy.name}! AUTO-SELLING ALL POSITIONS...`);
+                console.log(`   📊 Average Price: ${averagePrice.toFixed(8)} WLD`);
+                console.log(`   📊 Current Price: ${currentPrice.toFixed(8)} WLD`);
+                console.log(`   📊 Profit Target: ${strategy.profitRangeMin}% (${minPrice.toFixed(8)} WLD)`);
+                console.log(`   💹 Current Profit: ${unrealizedPnLPercent.toFixed(2)}%`);
+                console.log(`   🚀 EXECUTING IMMEDIATE AUTO-SELL!`);
                 
-                // Find which sell step we should execute
-                const applicableSteps = rangeState.sellSteps.filter(step => 
-                    currentPrice >= step.triggerPrice && !step.executed
-                );
-                
-                if (applicableSteps.length > 0) {
-                    // Execute the highest applicable step
-                    const stepToExecute = applicableSteps.sort((a, b) => b.triggerPrice - a.triggerPrice)[0];
-                    
-                    console.log(`🚀 AUTO-SELLING - Executing Profit Range Step ${stepToExecute.stepNumber}:`);
-                    console.log(`   📈 Trigger: ${stepToExecute.profitPercent}% (${stepToExecute.triggerPrice.toFixed(8)} WLD)`);
-                    console.log(`   💰 Sell Amount: ${stepToExecute.sellPercentage}% of remaining positions`);
-                    console.log(`   🎯 Expected: ${stepToExecute.expectedTokens.toFixed(6)} tokens`);
-                    
-                    await this.executeProfitRangeStep(strategy, stepToExecute, currentPrice);
-                } else {
-                    // Check if we're above the profit range and should sell everything
-                    if (unrealizedPnLPercent > strategy.profitRangeMax) {
-                        if (unrealizedPnLPercent > strategy.profitRangeMax * 1.5) {
-                            // Emergency sell for very high profits
-                            console.log(`🚨 PROFIT EXCEEDS 1.5x TARGET! Auto-selling remaining positions...`);
-                            console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (Target: ${strategy.profitRangeMax}%)`);
-                            console.log(`   🚀 EMERGENCY AUTO-SELL TRIGGERED!`);
-                            
-                            // Execute emergency profit taking
-                            await this.executeEmergencyProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent);
-                        } else {
-                            // Regular sell for profits above range
-                            console.log(`🎯 PROFIT ABOVE TARGET RANGE! Auto-selling all positions...`);
-                            console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (Target Range: ${strategy.profitRangeMin}%-${strategy.profitRangeMax}%)`);
-                            console.log(`   🚀 AUTO-SELL ACTIVATED!`);
-                            
-                            // Execute complete profit taking
-                            await this.executeEmergencyProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent);
-                        }
-                    } else {
-                        // Show range progress
-                        const rangeProgress = Math.min(100, ((currentPrice - minPrice) / (maxPrice - minPrice)) * 100);
-                        console.log(`   📊 Range Progress: ${rangeProgress.toFixed(1)}% through profit range`);
-                        
-                        const nextStep = rangeState.sellSteps.find(step => !step.executed);
-                        if (nextStep) {
-                            console.log(`   ⏳ Next Sell: ${nextStep.profitPercent}% at ${nextStep.triggerPrice.toFixed(8)} WLD`);
-                        } else {
-                            // All steps executed but still in profit - suggest manual action
-                            console.log(`   🎯 All profit steps completed. Consider manual sell at ${unrealizedPnLPercent.toFixed(2)}% profit!`);
-                        }
-                    }
-                }
+                // Execute immediate complete sell when profit range is reached
+                await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'profit_target_reached');
             } else {
                 // Show how close we are to profit range
                 const progressToRange = ((currentPrice - averagePrice) / (minPrice - averagePrice)) * 100;
@@ -1117,6 +1081,103 @@ class StrategyBuilder extends EventEmitter {
             
         } catch (error) {
             console.error(`❌ Error executing profit range step:`, error.message);
+        }
+    }
+    
+    // Execute immediate profit sell when profit target is reached
+    async executeImmediateProfitSell(strategy, openPositions, currentPrice, profitPercent, reason = 'profit_target_reached') {
+        try {
+            console.log(`🚀 IMMEDIATE AUTO-SELL EXECUTING...`);
+            console.log(`   📊 Reason: ${reason}`);
+            console.log(`   📊 Current Profit: ${profitPercent.toFixed(2)}%`);
+            console.log(`   📊 Target Profit: ${strategy.profitRangeMin}%`);
+            
+            const totalTokens = openPositions.reduce((sum, pos) => sum + pos.entryAmountToken, 0);
+            const totalInvested = openPositions.reduce((sum, pos) => sum + pos.entryAmountWLD, 0);
+            
+            console.log(`   💰 Selling ALL: ${totalTokens.toFixed(6)} tokens`);
+            console.log(`   📊 Original Investment: ${totalInvested.toFixed(6)} WLD`);
+            console.log(`   📊 Expected Value: ${(totalTokens * currentPrice).toFixed(6)} WLD`);
+            
+            // Execute complete sell
+            const sellResult = await this.sinclaveEngine.executeOptimizedSwap(
+                strategy.walletObject,
+                strategy.targetToken,
+                this.WLD_ADDRESS,
+                totalTokens,
+                strategy.maxSlippage
+            );
+            
+            if (sellResult.success) {
+                const wldReceived = parseFloat(sellResult.amountOut);
+                const realizedProfit = wldReceived - totalInvested;
+                const realizedProfitPercent = (realizedProfit / totalInvested) * 100;
+                
+                // Close all positions
+                openPositions.forEach(pos => {
+                    pos.status = 'closed';
+                    pos.exitPrice = currentPrice;
+                    pos.exitTimestamp = Date.now();
+                    pos.exitReason = reason;
+                    pos.realizedPnL = (pos.entryAmountToken * currentPrice) - pos.entryAmountWLD;
+                    pos.realizedPnLPercent = (pos.realizedPnL / pos.entryAmountWLD) * 100;
+                });
+                
+                // Update strategy stats
+                strategy.totalTrades++;
+                strategy.successfulTrades++;
+                strategy.totalProfit += realizedProfit;
+                strategy.lastTradeTimestamp = Date.now();
+                
+                console.log(`🎉 AUTO-SELL COMPLETED SUCCESSFULLY!`);
+                console.log(`   💰 Sold: ${totalTokens.toFixed(6)} tokens`);
+                console.log(`   💰 Received: ${wldReceived.toFixed(6)} WLD`);
+                console.log(`   🎯 Realized Profit: ${realizedProfit.toFixed(6)} WLD (${realizedProfitPercent.toFixed(2)}%)`);
+                console.log(`   📊 All positions closed automatically`);
+                
+                // Send Telegram notification
+                if (this.telegramNotifications) {
+                    await this.telegramNotifications.notifyTradeExecution({
+                        type: 'sell',
+                        tokenSymbol: strategy.targetTokenSymbol || strategy.name,
+                        amount: totalTokens.toFixed(6),
+                        outputAmount: wldReceived.toFixed(6),
+                        price: currentPrice.toFixed(8),
+                        reason: `Auto-Sell: Profit Target Reached (${profitPercent.toFixed(1)}%)`,
+                        profit: realizedProfit.toFixed(4),
+                        profitPercent: realizedProfitPercent.toFixed(1)
+                    });
+                    
+                    await this.telegramNotifications.notifyProfitAlert({
+                        tokenSymbol: strategy.targetTokenSymbol || strategy.name,
+                        entryPrice: totalInvested / totalTokens,
+                        currentPrice: currentPrice,
+                        amount: totalTokens,
+                        currentValue: wldReceived,
+                        unrealizedPnL: realizedProfit,
+                        strategy: `${strategy.name} (Auto-Sell Complete)`
+                    }, realizedProfitPercent);
+                }
+                
+                this.saveStrategies();
+                
+                // Mark strategy as completed since all positions are sold
+                strategy.status = 'completed';
+                strategy.completionReason = reason;
+                strategy.finalProfit = realizedProfit;
+                strategy.finalProfitPercent = realizedProfitPercent;
+                strategy.autoSellExecuted = true;
+                strategy.autoSellTimestamp = Date.now();
+                
+                console.log(`✅ Strategy "${strategy.name}" completed with auto-sell`);
+                
+            } else {
+                console.log(`❌ Auto-Sell Failed: ${sellResult.error}`);
+                console.log(`   🔄 Will retry on next price check...`);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error in immediate auto-sell:`, error.message);
         }
     }
     
