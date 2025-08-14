@@ -281,8 +281,20 @@ class TradingStrategy extends EventEmitter {
     async executeSellTrade(tokenAddress, reason = 'manual') {
         try {
             const position = this.positions.get(tokenAddress);
-            if (!position || position.status !== 'open') {
-                throw new Error('No open position found for this token');
+            if (!position) {
+                console.log(`❌ DEBUG: No position found for token ${tokenAddress}`);
+                console.log(`❌ DEBUG: Available positions:`, Array.from(this.positions.keys()));
+                throw new Error('No position found for this token');
+            }
+            if (position.status !== 'open') {
+                console.log(`❌ DEBUG: Position status is '${position.status}', not 'open'`);
+                console.log(`❌ DEBUG: Position details:`, {
+                    id: position.id,
+                    status: position.status,
+                    tokenAddress: position.tokenAddress,
+                    walletAddress: position.walletAddress
+                });
+                throw new Error(`Position status is '${position.status}', expected 'open'`);
             }
             
             console.log(`🔄 Executing SELL trade: ${position.entryAmountToken} tokens -> WLD (${reason})`);
@@ -444,13 +456,21 @@ class TradingStrategy extends EventEmitter {
     // Monitor a single position (ENHANCED WITH REVERSE SWAP QUOTES)
     async monitorPosition(tokenAddress) {
         const position = this.positions.get(tokenAddress);
-        if (!position || position.status !== 'open') {
+        if (!position) {
+            console.log(`❌ DEBUG: Monitoring stopped - no position found for ${tokenAddress}`);
+            console.log(`❌ DEBUG: Available positions:`, Array.from(this.positions.keys()));
+            this.stopPositionMonitoring(tokenAddress);
+            return;
+        }
+        if (position.status !== 'open') {
+            console.log(`❌ DEBUG: Monitoring stopped - position status is '${position.status}' for ${tokenAddress}`);
             this.stopPositionMonitoring(tokenAddress);
             return;
         }
         
         // Skip if position is already being processed
         if (this.positionLocks.get(tokenAddress)) {
+            console.log(`⏳ DEBUG: Position ${position.id} is locked, skipping monitoring cycle`);
             return;
         }
         

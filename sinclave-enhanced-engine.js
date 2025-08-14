@@ -148,30 +148,29 @@ class SinclaveEnhancedTradingEngine {
     
     // Calculate optimized gas settings based on sinclave.js proven patterns
     calculateOptimizedGasSettings(networkGasPrice, isReplacementTx = false) {
-        // SPEED OPTIMIZATION: Use higher base gas for faster execution
-        const baseGasPrice = ethers.parseUnits('0.002', 'gwei'); // Increased from 0.001 for speed
-        const priorityFee = ethers.parseUnits('0.0005', 'gwei'); // Increased from 0.0001 for speed
+        // ULTRA FAST EXECUTION: Aggressive gas settings for sub-3000ms execution
+        const baseGasPrice = ethers.parseUnits('0.005', 'gwei'); // Increased from 0.002 for ultra speed
+        const priorityFee = ethers.parseUnits('0.002', 'gwei'); // Increased from 0.0005 for ultra speed
         
         // Use network gas if higher than our proven base (but prioritize speed)
         const networkGas = networkGasPrice || baseGasPrice;
         let finalGasPrice = networkGas > baseGasPrice ? networkGas : baseGasPrice;
         let finalPriorityFee = priorityFee;
         
-        // SPEED BOOST: Add 25% buffer for ultra-fast execution
-        finalGasPrice = finalGasPrice * BigInt(125) / BigInt(100); // 25% boost
-        finalPriorityFee = finalPriorityFee * BigInt(125) / BigInt(100); // 25% boost
+        // ULTRA SPEED BOOST: Add 50% buffer for ultra-fast execution
+        finalGasPrice = finalGasPrice * BigInt(150) / BigInt(100); // 50% boost
+        finalPriorityFee = finalPriorityFee * BigInt(150) / BigInt(100); // 50% boost
         
-        // For replacement transactions, increase by 15% (reduced from 10% for faster processing)
+        // For replacement transactions, increase by 25% for immediate processing
         if (isReplacementTx) {
-            finalPriorityFee = finalPriorityFee * BigInt(115) / BigInt(100); // 15% increase
-            finalGasPrice = finalGasPrice * BigInt(115) / BigInt(100);
-            console.log('⚡ Replacement transaction detected, increasing gas price by 15%');
+            finalPriorityFee = finalPriorityFee * BigInt(125) / BigInt(100); // 25% increase
+            finalGasPrice = finalGasPrice * BigInt(125) / BigInt(100);
         }
         
         return {
             maxFeePerGas: finalGasPrice + finalPriorityFee,
             maxPriorityFeePerGas: finalPriorityFee,
-            gasLimit: 300000 // Increased from 280000 for complex swaps
+            gasLimit: 350000 // Increased from 300000 for guaranteed execution
         };
     }
     
@@ -249,16 +248,17 @@ class SinclaveEnhancedTradingEngine {
             // Step 5: Apply proven routing fix
             const fixedQuote = this.applyProvenRoutingFix(quote, signer.address);
             
-            // Step 6: Optimize gas settings (CACHED VALUES)
+            // Step 6: Optimize gas settings (CACHED VALUES) - ULTRA FAST
             const gasSettings = this.calculateOptimizedGasSettings(feeData.gasPrice);
-            console.log(`⛽ Optimized Gas: ${ethers.formatUnits(gasSettings.maxFeePerGas, 'gwei')} gwei`);
+            // Reduced logging for speed
             
-            // Step 7: FAST APPROVAL - Check and approve in parallel if needed
+            // Step 7: ULTRA FAST APPROVAL - Parallel check and approve
             const currentAllowance = await tokenInContract.allowance(signer.address, fixedQuote.to);
             const needsApproval = currentAllowance < amountInWei;
             
             if (needsApproval) {
-                console.log('🔓 Approving token spending with optimized gas...');
+                // Minimal logging for speed
+                console.log('🔓 Approving token spending...');
                 
                 const approveTx = await tokenInContract.approve(fixedQuote.to, amountInWei, {
                     gasLimit: 60000,
@@ -266,12 +266,12 @@ class SinclaveEnhancedTradingEngine {
                     maxPriorityFeePerGas: gasSettings.maxPriorityFeePerGas
                 });
                 
+                // Reduced logging
                 console.log(`📝 Approval TX: ${approveTx.hash}`);
-                console.log(`🔗 WorldScan: https://worldscan.org/tx/${approveTx.hash}`);
                 
-                // OPTIMIZED: Wait for approval with faster confirmation
-                const approvalReceipt = await approveTx.wait(1); // Wait for 1 confirmation instead of default
-                console.log(`✅ Approval confirmed in block ${approvalReceipt.blockNumber}`);
+                // ULTRA FAST: No confirmation wait - proceed immediately
+                // const approvalReceipt = await approveTx.wait(1);
+                console.log(`✅ Approval sent, proceeding to swap`);
             } else {
                 console.log('✅ Already approved - proceeding to swap');
             }
@@ -319,8 +319,7 @@ class SinclaveEnhancedTradingEngine {
             console.log(`🚀 Swap TX sent: ${swapTx.hash}`);
             console.log(`🔗 WorldScan: https://worldscan.org/tx/${swapTx.hash}`);
             
-            console.log('⏳ Waiting for confirmation...');
-            // SPEED OPTIMIZATION: Wait for 1 confirmation instead of default 2
+            // ULTRA FAST: Minimal confirmation wait
             const receipt = await swapTx.wait(1);
             
             const executionTime = Date.now() - startTime;
@@ -355,13 +354,15 @@ class SinclaveEnhancedTradingEngine {
                     }
                 }
                 
-                // Performance feedback
-                if (executionTime < 3000) {
+                // Performance feedback - NEW ULTRA-FAST TARGETS
+                if (executionTime < 2000) {
                     console.log(`🚀 ULTRA-FAST EXECUTION: ${executionTime}ms - EXCELLENT!`);
-                } else if (executionTime < 6000) {
+                } else if (executionTime < 4000) {
                     console.log(`⚡ FAST EXECUTION: ${executionTime}ms - GOOD`);
-                } else {
+                } else if (executionTime < 8000) {
                     console.log(`⏳ STANDARD EXECUTION: ${executionTime}ms`);
+                } else {
+                    console.log(`🐌 SLOW EXECUTION: ${executionTime}ms - NEEDS OPTIMIZATION`);
                 }
                 
                 // Update metrics
