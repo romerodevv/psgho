@@ -2841,6 +2841,592 @@ class WorldchainTradingBot {
 
         await this.getUserInput('\nPress Enter to continue...');
     }
+
+    // Quick Console Commands Interface
+    async quickConsoleCommands() {
+        console.clear();
+        console.log('⚡ QUICK CONSOLE COMMANDS');
+        console.log('════════════════════════════════════════════════════════════');
+        console.log('💡 IMMEDIATE TRADING:');
+        console.log('   buy YIELD 0.10        - Buy with 0.10 WLD immediately');
+        console.log('   buy YIELD all         - Buy with entire WLD balance');
+        console.log('   sell YIELD all        - Sell all YIELD tokens');
+        console.log('   sell YIELD 35         - Sell 35 YIELD tokens');
+        console.log('');
+        console.log('🕐 TIME-BASED SMART TRADING:');
+        console.log('   buy YIELD 1h          - Buy at best rate from last hour');
+        console.log('   buy YIELD 6h          - Buy at best rate from 6-hour period');
+        console.log('   sell YIELD 1h         - Sell at best rate from last hour');
+        console.log('   sell YIELD 6h         - Sell at best rate from 6-hour period');
+        console.log('');
+        console.log('🎯 STRATEGY CREATION:');
+        console.log('   buy YIELD 0.10 d15 p15 - Create strategy (0.10 WLD, 15% DIP, 15% profit)');
+        console.log('   buy ORO 0.05 d10 p20   - Create strategy (0.05 WLD, 10% DIP, 20% profit)');
+        console.log('');
+        console.log('📊 UTILITY COMMANDS:');
+        console.log('   status                - Show all active positions');
+        console.log('   balance               - Show wallet balances');
+        console.log('   help                  - Show command help');
+        console.log('   exit                  - Return to main menu');
+        console.log('════════════════════════════════════════════════════════════');
+        
+        while (true) {
+            const command = await this.getUserInput('\n⚡ Enter command (or "exit" to return): ');
+            
+            if (command.toLowerCase().trim() === 'exit') {
+                break;
+            }
+            
+            await this.executeConsoleCommand(command.trim());
+        }
+    }
+
+    // Execute console command and open position tracker
+    async executeConsoleCommand(command) {
+        try {
+            const parsed = this.parseCommand(command);
+            
+            if (!parsed) {
+                console.log('❌ Invalid command format. Type "help" for usage examples.');
+                return;
+            }
+            
+            console.log(`\n🚀 Executing: ${command}`);
+            console.log('─'.repeat(60));
+            
+            let result = null;
+            
+            switch (parsed.action) {
+                case 'buy':
+                    result = await this.executeBuyCommand(parsed);
+                    break;
+                case 'sell':
+                    result = await this.executeSellCommand(parsed);
+                    break;
+                case 'status':
+                    await this.showPositionStatus();
+                    return;
+                case 'balance':
+                    await this.showWalletBalances();
+                    return;
+                case 'help':
+                    await this.showCommandHelp();
+                    return;
+                default:
+                    console.log('❌ Unknown command. Type "help" for available commands.');
+                    return;
+            }
+            
+            // Open position tracker if trade was executed
+            if (result && (result.success || result.positionId)) {
+                await this.openPositionTracker(result);
+            }
+            
+        } catch (error) {
+            console.log(`❌ Command execution failed: ${error.message}`);
+        }
+    }
+
+    // Parse console command into structured format
+    parseCommand(command) {
+        const parts = command.toLowerCase().split(' ').filter(p => p.length > 0);
+        
+        if (parts.length === 0) return null;
+        
+        const action = parts[0]; // buy, sell, status, balance, help
+        
+        // Utility commands
+        if (['status', 'balance', 'help'].includes(action)) {
+            return { action };
+        }
+        
+        // Trading commands need at least token
+        if (parts.length < 2) return null;
+        
+        const token = parts[1].toUpperCase(); // YIELD, ORO, etc.
+        
+        if (action === 'buy') {
+            if (parts.length === 2) {
+                return null; // Need amount or timeframe
+            }
+            
+            const param = parts[2];
+            
+            // Time-based trading: buy YIELD 1h, buy YIELD 6h
+            if (param.endsWith('h') || param.endsWith('m')) {
+                return {
+                    action: 'buy',
+                    token,
+                    type: 'time-based',
+                    timeframe: param
+                };
+            }
+            
+            // Immediate trading: buy YIELD 0.10, buy YIELD all
+            if (param === 'all' || !isNaN(parseFloat(param))) {
+                const parsed = {
+                    action: 'buy',
+                    token,
+                    type: 'immediate',
+                    amount: param === 'all' ? 'all' : parseFloat(param)
+                };
+                
+                // Strategy creation: buy YIELD 0.10 d15 p15
+                if (parts.length >= 5) {
+                    const dipParam = parts[3];
+                    const profitParam = parts[4];
+                    
+                    if (dipParam.startsWith('d') && profitParam.startsWith('p')) {
+                        const dipThreshold = parseFloat(dipParam.substring(1));
+                        const profitTarget = parseFloat(profitParam.substring(1));
+                        
+                        if (!isNaN(dipThreshold) && !isNaN(profitTarget)) {
+                            parsed.type = 'strategy';
+                            parsed.dipThreshold = dipThreshold;
+                            parsed.profitTarget = profitTarget;
+                        }
+                    }
+                }
+                
+                return parsed;
+            }
+        }
+        
+        if (action === 'sell') {
+            if (parts.length === 2) {
+                return null; // Need amount or timeframe
+            }
+            
+            const param = parts[2];
+            
+            // Time-based selling: sell YIELD 1h, sell YIELD 6h
+            if (param.endsWith('h') || param.endsWith('m')) {
+                return {
+                    action: 'sell',
+                    token,
+                    type: 'time-based',
+                    timeframe: param
+                };
+            }
+            
+            // Immediate selling: sell YIELD all, sell YIELD 35
+            if (param === 'all' || !isNaN(parseFloat(param))) {
+                return {
+                    action: 'sell',
+                    token,
+                    type: 'immediate',
+                    amount: param === 'all' ? 'all' : parseFloat(param)
+                };
+            }
+        }
+        
+        return null;
+    }
+
+    // Execute buy command
+    async executeBuyCommand(parsed) {
+        try {
+            const tokenAddress = this.getTokenAddress(parsed.token);
+            if (!tokenAddress) {
+                console.log(`❌ Unknown token: ${parsed.token}`);
+                console.log('💡 Available tokens: YIELD, ORO, Ramen');
+                return { success: false };
+            }
+
+            if (parsed.type === 'immediate') {
+                return await this.executeImmediateBuy(parsed, tokenAddress);
+                         } else if (parsed.type === 'time-based') {
+                 return await this.executeTimeBasedBuy(parsed, tokenAddress);
+            } else if (parsed.type === 'strategy') {
+                return await this.executeStrategyBuy(parsed, tokenAddress);
+            }
+
+        } catch (error) {
+            console.log(`❌ Buy command failed: ${error.message}`);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Execute sell command
+    async executeSellCommand(parsed) {
+        try {
+            const tokenAddress = this.getTokenAddress(parsed.token);
+            if (!tokenAddress) {
+                console.log(`❌ Unknown token: ${parsed.token}`);
+                return { success: false };
+            }
+
+            if (parsed.type === 'immediate') {
+                return await this.executeImmediateSell(parsed, tokenAddress);
+            } else if (parsed.type === 'time-based') {
+                return await this.executeTimeBasedSell(parsed, tokenAddress);
+            }
+
+        } catch (error) {
+            console.log(`❌ Sell command failed: ${error.message}`);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Get token address from symbol
+    getTokenAddress(symbol) {
+        const tokenMap = {
+            'YIELD': '0x1a16f733b813a59815a76293dac835ad1c7fedff',
+            'ORO': '0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63',
+            'RAMEN': '0xc6f44893a558d9ae0576a2bb6bfa9c1c3f313815'
+        };
+        
+        return tokenMap[symbol.toUpperCase()] || null;
+    }
+
+    // Execute immediate buy
+    async executeImmediateBuy(parsed, tokenAddress) {
+        console.log(`💰 Immediate Buy: ${parsed.token} with ${parsed.amount === 'all' ? 'ALL WLD' : parsed.amount + ' WLD'}`);
+        
+        // Get selected wallet
+        const walletChoice = await this.selectWalletForTrade();
+        if (!walletChoice) return { success: false };
+        
+        const wallet = this.wallets[walletChoice];
+        
+        // Determine amount
+        let tradeAmount = parsed.amount;
+        if (parsed.amount === 'all') {
+            // Get WLD balance
+            const wldBalance = await this.getWLDBalance(wallet.address);
+            tradeAmount = parseFloat(wldBalance) * 0.99; // Leave small buffer for gas
+            console.log(`📊 Using ${tradeAmount.toFixed(6)} WLD (99% of balance)`);
+        }
+        
+        // Execute trade
+        const startTime = Date.now();
+        const result = await this.sinclaveEngine.executeOptimizedSwap(
+            wallet,
+            this.WLD_ADDRESS,
+            tokenAddress,
+            tradeAmount,
+            2 // 2% slippage for immediate trades
+        );
+        
+        const executionTime = Date.now() - startTime;
+        
+        if (result.success) {
+            console.log(`✅ SUCCESSFUL BUY!`);
+            console.log(`   💰 Spent: ${tradeAmount} WLD`);
+            console.log(`   📈 Received: ${result.amountOut} ${parsed.token}`);
+            console.log(`   ⚡ Execution Time: ${executionTime}ms`);
+            console.log(`   🧾 TX Hash: ${result.txHash}`);
+            
+            return {
+                success: true,
+                type: 'immediate_buy',
+                token: parsed.token,
+                tokenAddress,
+                amountIn: tradeAmount,
+                amountOut: result.amountOut,
+                txHash: result.txHash,
+                executionTime,
+                entryPrice: tradeAmount / parseFloat(result.amountOut),
+                wallet: wallet.address
+            };
+        } else {
+            console.log(`❌ FAILED BUY!`);
+            console.log(`   💥 Error: ${result.error}`);
+            console.log(`   ⚡ Execution Time: ${executionTime}ms`);
+            
+            return { success: false, error: result.error };
+        }
+    }
+
+    // Execute immediate sell
+    async executeImmediateSell(parsed, tokenAddress) {
+        console.log(`💰 Immediate Sell: ${parsed.amount === 'all' ? 'ALL' : parsed.amount} ${parsed.token}`);
+        
+        // Get selected wallet
+        const walletChoice = await this.selectWalletForTrade();
+        if (!walletChoice) return { success: false };
+        
+        const wallet = this.wallets[walletChoice];
+        
+        // Get token balance
+        const tokenBalance = await this.getTokenBalance(tokenAddress, wallet.address);
+        if (parseFloat(tokenBalance) === 0) {
+            console.log(`❌ No ${parsed.token} tokens to sell`);
+            return { success: false };
+        }
+        
+        // Determine amount
+        let sellAmount = parsed.amount;
+        if (parsed.amount === 'all') {
+            sellAmount = parseFloat(tokenBalance);
+            console.log(`📊 Selling ${sellAmount.toFixed(6)} ${parsed.token} (all tokens)`);
+        } else if (parsed.amount > parseFloat(tokenBalance)) {
+            console.log(`❌ Insufficient ${parsed.token} balance. Have: ${tokenBalance}, Want: ${parsed.amount}`);
+            return { success: false };
+        }
+        
+        // Execute trade
+        const startTime = Date.now();
+        const result = await this.sinclaveEngine.executeOptimizedSwap(
+            wallet,
+            tokenAddress,
+            this.WLD_ADDRESS,
+            sellAmount,
+            2 // 2% slippage for immediate trades
+        );
+        
+        const executionTime = Date.now() - startTime;
+        
+        if (result.success) {
+            console.log(`✅ SUCCESSFUL SELL!`);
+            console.log(`   📉 Sold: ${sellAmount} ${parsed.token}`);
+            console.log(`   💰 Received: ${result.amountOut} WLD`);
+            console.log(`   ⚡ Execution Time: ${executionTime}ms`);
+            console.log(`   🧾 TX Hash: ${result.txHash}`);
+            
+            return {
+                success: true,
+                type: 'immediate_sell',
+                token: parsed.token,
+                tokenAddress,
+                amountIn: sellAmount,
+                amountOut: result.amountOut,
+                txHash: result.txHash,
+                executionTime,
+                exitPrice: parseFloat(result.amountOut) / sellAmount,
+                wallet: wallet.address
+            };
+        } else {
+            console.log(`❌ FAILED SELL!`);
+            console.log(`   💥 Error: ${result.error}`);
+            console.log(`   ⚡ Execution Time: ${executionTime}ms`);
+            
+            return { success: false, error: result.error };
+        }
+    }
+
+    // Open real-time position tracker
+    async openPositionTracker(result) {
+        console.log(`\n📊 OPENING POSITION TRACKER...`);
+        console.log('═'.repeat(80));
+        
+        // Create position tracking object
+        const position = {
+            id: `pos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: result.type,
+            token: result.token,
+            tokenAddress: result.tokenAddress,
+            wallet: result.wallet,
+            entryTime: Date.now(),
+            entryPrice: result.entryPrice || null,
+            exitPrice: result.exitPrice || null,
+            amountIn: result.amountIn,
+            amountOut: result.amountOut,
+            txHash: result.txHash,
+            isActive: result.type.includes('buy'), // Buy positions are active, sell positions are closed
+            initialValue: result.type.includes('buy') ? result.amountIn : result.amountOut
+        };
+        
+        if (position.isActive) {
+            // Start real-time tracking for buy positions
+            await this.startPositionTracking(position);
+        } else {
+            // Show final results for sell positions
+            await this.showFinalResults(position);
+        }
+    }
+
+    // Start real-time position tracking
+    async startPositionTracking(position) {
+        console.log(`🎯 TRACKING POSITION: ${position.token}`);
+        console.log(`   📍 Position ID: ${position.id}`);
+        console.log(`   💰 Entry: ${position.amountIn} WLD → ${position.amountOut} ${position.token}`);
+        console.log(`   📈 Entry Price: ${position.entryPrice.toFixed(8)} WLD per ${position.token}`);
+        console.log(`   🧾 TX: ${position.txHash}`);
+        console.log('─'.repeat(80));
+        
+        let updateCount = 0;
+        const maxUpdates = 60; // Track for 5 minutes (5-second intervals)
+        
+        const trackingInterval = setInterval(async () => {
+            try {
+                updateCount++;
+                
+                // Get current price
+                const currentPrice = await this.getCurrentTokenPrice(position.tokenAddress);
+                const currentValue = position.amountOut * currentPrice;
+                const pnl = currentValue - position.initialValue;
+                const pnlPercent = (pnl / position.initialValue) * 100;
+                
+                // Color coding for profit/loss
+                const pnlColor = pnl >= 0 ? '\x1b[32m' : '\x1b[31m'; // Green or Red
+                const resetColor = '\x1b[0m';
+                
+                console.log(`\n📊 Position Update #${updateCount}:`);
+                console.log(`   ⏰ Runtime: ${Math.floor((Date.now() - position.entryTime) / 1000)}s`);
+                console.log(`   📈 Current Price: ${currentPrice.toFixed(8)} WLD per ${position.token}`);
+                console.log(`   💰 Current Value: ${currentValue.toFixed(6)} WLD`);
+                console.log(`   ${pnlColor}💹 P&L: ${pnl.toFixed(6)} WLD (${pnlPercent.toFixed(2)}%)${resetColor}`);
+                
+                if (pnl >= 0) {
+                    console.log(`   ✅ STATUS: IN PROFIT 📈`);
+                } else {
+                    console.log(`   ❌ STATUS: IN LOSS 📉`);
+                }
+                
+                // Stop tracking after maxUpdates or if user wants to exit
+                if (updateCount >= maxUpdates) {
+                    clearInterval(trackingInterval);
+                    console.log(`\n⏰ Tracking completed (${maxUpdates} updates)`);
+                    await this.showFinalResults(position, { currentPrice, currentValue, pnl, pnlPercent });
+                }
+                
+            } catch (error) {
+                console.log(`❌ Tracking error: ${error.message}`);
+            }
+        }, 5000); // Update every 5 seconds
+        
+        // Allow user to stop tracking early
+        setTimeout(async () => {
+            const stopChoice = await this.getUserInput('\n⏹️  Press Enter to stop tracking and return to commands...');
+            clearInterval(trackingInterval);
+            console.log(`\n🛑 Position tracking stopped by user`);
+        }, 2000);
+    }
+
+    // Show final results
+    async showFinalResults(position, currentData = null) {
+        console.log(`\n🏁 FINAL POSITION RESULTS`);
+        console.log('═'.repeat(80));
+        
+        if (position.type.includes('sell')) {
+            // Sell trade - show immediate results
+            console.log(`✅ TRADE COMPLETED SUCCESSFULLY`);
+            console.log(`   📉 Sold: ${position.amountIn} ${position.token}`);
+            console.log(`   💰 Received: ${position.amountOut} WLD`);
+            console.log(`   📈 Exit Price: ${position.exitPrice.toFixed(8)} WLD per ${position.token}`);
+            console.log(`   🧾 Transaction: ${position.txHash}`);
+        } else if (currentData) {
+            // Buy trade with tracking data
+            const pnlColor = currentData.pnl >= 0 ? '\x1b[32m' : '\x1b[31m';
+            const resetColor = '\x1b[0m';
+            const statusIcon = currentData.pnl >= 0 ? '✅' : '❌';
+            const statusText = currentData.pnl >= 0 ? 'PROFITABLE' : 'IN LOSS';
+            
+            console.log(`${statusIcon} POSITION STATUS: ${statusText}`);
+            console.log(`   💰 Initial Investment: ${position.initialValue.toFixed(6)} WLD`);
+            console.log(`   📈 Current Value: ${currentData.currentValue.toFixed(6)} WLD`);
+            console.log(`   ${pnlColor}💹 Final P&L: ${currentData.pnl.toFixed(6)} WLD (${currentData.pnlPercent.toFixed(2)}%)${resetColor}`);
+            console.log(`   ⏱️  Total Runtime: ${Math.floor((Date.now() - position.entryTime) / 1000)}s`);
+        }
+        
+        console.log('═'.repeat(80));
+        await this.getUserInput('Press Enter to continue...');
+    }
+
+    // Helper method to select wallet for trading
+    async selectWalletForTrade() {
+        if (Object.keys(this.wallets).length === 1) {
+            return 0; // Use the only wallet
+        }
+        
+        console.log('\n👛 Select wallet:');
+        Object.entries(this.wallets).forEach(([index, wallet]) => {
+            console.log(`${parseInt(index) + 1}. ${wallet.name || `Wallet ${parseInt(index) + 1}`} (${wallet.address})`);
+        });
+        
+        const choice = await this.getUserInput('Select wallet number: ');
+        const walletIndex = parseInt(choice) - 1;
+        
+        if (walletIndex >= 0 && walletIndex < Object.keys(this.wallets).length) {
+            return walletIndex;
+        }
+        
+        console.log('❌ Invalid wallet selection');
+        return null;
+    }
+
+    // Helper method to get current token price
+    async getCurrentTokenPrice(tokenAddress) {
+        try {
+            const quote = await this.sinclaveEngine.getHoldStationQuote(
+                tokenAddress,
+                this.WLD_ADDRESS,
+                1, // 1 token
+                '0x0000000000000000000000000000000000000001'
+            );
+            
+            return quote && quote.expectedOutput ? parseFloat(quote.expectedOutput) : 0;
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    // Show command help
+    async showCommandHelp() {
+        console.log('\n📖 COMMAND HELP');
+        console.log('═'.repeat(60));
+        console.log('Format: [action] [token] [amount/timeframe] [options]');
+        console.log('');
+        console.log('Examples:');
+        console.log('  buy YIELD 0.10        → Buy YIELD with 0.10 WLD now');
+        console.log('  buy YIELD all         → Buy YIELD with all WLD balance');
+        console.log('  sell YIELD 35         → Sell 35 YIELD tokens now');
+        console.log('  sell YIELD all        → Sell all YIELD tokens now');
+        console.log('  buy YIELD 1h          → Buy at best 1-hour rate');
+        console.log('  sell YIELD 6h         → Sell at best 6-hour rate');
+        console.log('  buy YIELD 0.1 d15 p20 → Create strategy (15% DIP, 20% profit)');
+        console.log('');
+        console.log('Available tokens: YIELD, ORO, RAMEN');
+        console.log('Timeframes: 1h, 6h, 12h, 24h');
+        console.log('Strategy: d[%] = DIP threshold, p[%] = profit target');
+    }
+
+    // Show position status
+    async showPositionStatus() {
+        console.log('\n📊 ACTIVE POSITIONS STATUS');
+        console.log('═'.repeat(60));
+        console.log('(This feature shows active strategy positions)');
+        
+        // Show active strategies
+        const activeStrategies = Array.from(this.strategyBuilder.activeStrategies.keys());
+        if (activeStrategies.length > 0) {
+            console.log(`🟢 Active Strategies: ${activeStrategies.length}`);
+            for (const strategyId of activeStrategies) {
+                const strategy = this.strategyBuilder.customStrategies.get(strategyId);
+                if (strategy) {
+                    const openPositions = strategy.positions.filter(p => p.status === 'open');
+                    console.log(`   📊 ${strategy.name}: ${openPositions.length} open positions`);
+                }
+            }
+        } else {
+            console.log('📭 No active strategies or positions');
+        }
+    }
+
+    // Show wallet balances
+    async showWalletBalances() {
+        console.log('\n💰 WALLET BALANCES');
+        console.log('═'.repeat(60));
+        
+        for (const [index, wallet] of Object.entries(this.wallets)) {
+            console.log(`👛 ${wallet.name || `Wallet ${parseInt(index) + 1}`}:`);
+            
+            const wldBalance = await this.getWLDBalance(wallet.address);
+            console.log(`   🌍 WLD: ${wldBalance}`);
+            
+            // Show discovered token balances
+            for (const [tokenAddress, token] of Object.entries(this.discoveredTokens)) {
+                if (tokenAddress.toLowerCase() !== this.WLD_ADDRESS.toLowerCase()) {
+                    const balance = await this.getTokenBalance(tokenAddress, wallet.address);
+                    if (parseFloat(balance) > 0) {
+                        console.log(`   🪙 ${token.symbol}: ${balance}`);
+                    }
+                }
+            }
+            console.log('');
+        }
+    }
 }
 
 // Start the bot
