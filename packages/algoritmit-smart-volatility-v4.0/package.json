@@ -1,0 +1,64 @@
+{
+  "name": "worldchain-trading-bot",
+  "version": "1.0.0",
+  "description": "Advanced interactive trading bot for Worldchain with WLD pair trading, wallet management, and token discovery",
+  "main": "worldchain-trading-bot.js",
+  "bin": {
+    "worldchain-bot": "./worldchain-trading-bot.js"
+  },
+  "scripts": {
+    "start": "node worldchain-trading-bot.js",
+    "dev": "nodemon worldchain-trading-bot.js",
+    "test": "jest",
+    "lint": "eslint *.js",
+    "format": "prettier --write *.js"
+  },
+  "keywords": [
+    "trading-bot",
+    "worldchain",
+    "wld",
+    "cryptocurrency",
+    "defi",
+    "automated-trading",
+    "blockchain",
+    "ethereum",
+    "layer2"
+  ],
+  "author": "WorldChain Trading Bot Developer",
+  "license": "MIT",
+  "dependencies": {
+    "@holdstation/worldchain-ethers-v6": "^4.0.29",
+    "@holdstation/worldchain-sdk": "^4.0.29",
+    "@worldcoin/minikit-js": "^1.9.6",
+    "axios": "^1.6.0",
+    "boxen": "^5.1.2",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.3",
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.9.0",
+    "figlet": "^1.7.0",
+    "inquirer": "^8.2.6",
+    "node-cron": "^3.0.3",
+    "ora": "^5.4.1",
+    "readline": "^1.3.0",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.52.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.1",
+    "prettier": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/worldchain-trading-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/worldchain-trading-bot/issues"
+  },
+  "homepage": "https://github.com/your-username/worldchain-trading-bot#readme"
+}
