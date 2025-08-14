@@ -6,13 +6,13 @@
 
 ### One-Line Install (Recommended)
 ```bash
-curl -fsSL https://raw.githubusercontent.com/your-username/worldchain-algoritmit-bot/main/install-algoritmit.sh | bash
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/install-algoritmit.sh | bash
 ```
 
 ### Manual Installation
 ```bash
-git clone https://github.com/your-username/worldchain-algoritmit-bot.git
-cd worldchain-algoritmit-bot
+git clone https://github.com/romerodevv/psgho.git
+cd psgho
 npm install
 ./install-holdstation-sdk.sh
 cp .env.example .env
@@ -233,8 +233,8 @@ npm install @holdstation/worldchain-ethers-v6@latest
 
 ### Development Setup
 ```bash
-git clone https://github.com/your-username/worldchain-algoritmit-bot.git
-cd worldchain-algoritmit-bot
+git clone https://github.com/romerodevv/psgho.git
+cd psgho
 npm install
 npm run dev
 ```

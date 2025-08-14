@@ -185,7 +185,7 @@ install_git() {
 clone_repository() {
     show_progress 4 8 "Cloning ALGORITMIT repository"
     
-    INSTALL_DIR="$HOME/worldchain-algoritmit-bot"
+    INSTALL_DIR="$HOME/psgho"
     
     if [ -d "$INSTALL_DIR" ]; then
         log_warning "Directory $INSTALL_DIR already exists"
@@ -202,7 +202,7 @@ clone_repository() {
     fi
     
     # Clone the repository (replace with actual GitHub URL)
-    git clone https://github.com/your-username/worldchain-algoritmit-bot.git "$INSTALL_DIR" >/dev/null 2>&1
+    git clone https://github.com/romerodevv/psgho.git "$INSTALL_DIR" >/dev/null 2>&1
     
     if [ ! -d "$INSTALL_DIR" ]; then
         log_error "Failed to clone repository"
@@ -326,12 +326,12 @@ show_instructions() {
     echo -e "${GREEN}║                         🎉 INSTALLATION SUCCESSFUL! 🎉                            ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${CYAN}📍 Installation Location:${NC} $HOME/worldchain-algoritmit-bot"
+    echo -e "${CYAN}📍 Installation Location:${NC} $HOME/psgho"
     echo ""
     echo -e "${YELLOW}🔧 NEXT STEPS:${NC}"
     echo ""
     echo -e "${WHITE}1. Configure your settings:${NC}"
-    echo -e "   ${GRAY}cd $HOME/worldchain-algoritmit-bot${NC}"
+    echo -e "   ${GRAY}cd $HOME/psgho${NC}"
     echo -e "   ${GRAY}nano .env${NC}"
     echo ""
     echo -e "${WHITE}2. Add your wallet private key and RPC settings to .env file${NC}"

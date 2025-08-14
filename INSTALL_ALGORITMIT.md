@@ -4,7 +4,7 @@
 
 ### One-Line Install Command
 ```bash
-curl -fsSL https://raw.githubusercontent.com/your-username/worldchain-algoritmit-bot/main/install-algoritmit.sh | bash
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/install-algoritmit.sh | bash
 ```
 
 ## Manual Installation
@@ -32,8 +32,8 @@ npm --version
 
 ### Step 2: Clone the Repository
 ```bash
-git clone https://github.com/your-username/worldchain-algoritmit-bot.git
-cd worldchain-algoritmit-bot
+git clone https://github.com/romerodevv/psgho.git
+cd psgho
 ```
 
 ### Step 3: Install Dependencies
@@ -204,7 +204,7 @@ After=network.target
 [Service]
 Type=simple
 User=algoritmit
-WorkingDirectory=/home/algoritmit/worldchain-algoritmit-bot
+WorkingDirectory=/home/algoritmit/psgho
 ExecStart=/usr/bin/node worldchain-trading-bot.js
 Restart=always
 RestartSec=10
@@ -268,8 +268,8 @@ sudo journalctl -u algoritmit-bot -n 50
 
 ```bash
 # Installation
-git clone https://github.com/your-username/worldchain-algoritmit-bot.git
-cd worldchain-algoritmit-bot
+git clone https://github.com/romerodevv/psgho.git
+cd psgho
 npm install
 ./install-holdstation-sdk.sh
 
