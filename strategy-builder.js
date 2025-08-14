@@ -49,9 +49,20 @@ class StrategyBuilder extends EventEmitter {
             tradeAmount: config.tradeAmount || 0.1, // WLD amount per trade
             maxSlippage: config.maxSlippage || 1, // Max slippage %
             
-            // Monitoring settings
-            priceCheckInterval: config.priceCheckInterval || 60000, // 1 minute for DIP detection
-            dipTimeframe: config.dipTimeframe || 60000, // Look back 1 minute for DIP
+            // Enhanced DIP detection settings
+            priceCheckInterval: config.priceCheckInterval || 30000, // 30 seconds for more frequent checks
+            dipTimeframe: config.dipTimeframe || 300000, // Default: 5 minutes (300000ms)
+            dipTimeframeLabel: this.getTimeframeLabel(config.dipTimeframe || 300000),
+            
+            // Historical price analysis settings
+            enableHistoricalComparison: config.enableHistoricalComparison || false,
+            historicalTimeframes: config.historicalTimeframes || {
+                '5min': 300000,    // 5 minutes
+                '1hour': 3600000,  // 1 hour  
+                '6hour': 21600000, // 6 hours
+                '24hour': 86400000, // 24 hours
+                '7day': 604800000  // 7 days
+            },
             
             // Strategy state
             isActive: false,
@@ -70,11 +81,27 @@ class StrategyBuilder extends EventEmitter {
         
         console.log(`✅ Strategy created: ${strategy.name} (${strategyId})`);
         console.log(`   📊 Pair: WLD → ${config.tokenSymbol}`);
-        console.log(`   📉 DIP Trigger: ${config.dipThreshold}% drop`);
+        console.log(`   📉 DIP Trigger: ${config.dipThreshold}% drop from highest in ${strategy.dipTimeframeLabel}`);
         console.log(`   📈 Profit Target: ${config.profitTarget}%`);
         console.log(`   💰 Trade Amount: ${config.tradeAmount} WLD`);
+        console.log(`   ⏱️ Price Checks: Every ${strategy.priceCheckInterval / 1000}s`);
         
         return strategy;
+    }
+    
+    // Helper method to convert timeframe to readable label
+    getTimeframeLabel(timeframeMs) {
+        const minutes = timeframeMs / 60000;
+        const hours = minutes / 60;
+        const days = hours / 24;
+        
+        if (days >= 1) {
+            return `${days}d`;
+        } else if (hours >= 1) {
+            return `${hours}h`;
+        } else {
+            return `${minutes}min`;
+        }
     }
     
     // Start monitoring a strategy
@@ -91,9 +118,12 @@ class StrategyBuilder extends EventEmitter {
         strategy.isActive = true;
         strategy.walletObject = walletObject;
         
-        // Initialize price history
+        // Initialize enhanced price history storage
         if (!this.priceHistory.has(strategy.targetToken)) {
-            this.priceHistory.set(strategy.targetToken, []);
+            this.priceHistory.set(strategy.targetToken, {
+                prices: [], // Array of {timestamp, price} objects
+                maxHistoryAge: Math.max(604800000, strategy.dipTimeframe * 2) // Keep 7 days or 2x dipTimeframe, whichever is longer
+            });
         }
         
         // Start monitoring interval
@@ -114,7 +144,8 @@ class StrategyBuilder extends EventEmitter {
         
         console.log(`🚀 Started strategy: ${strategy.name}`);
         console.log(`   🔄 Monitoring every ${strategy.priceCheckInterval / 1000} seconds`);
-        console.log(`   📊 Looking for ${strategy.dipThreshold}% DIP in ${strategy.dipTimeframe / 1000}s timeframe`);
+        console.log(`   📊 Looking for ${strategy.dipThreshold}% DIP from highest price in ${strategy.dipTimeframeLabel}`);
+        console.log(`   📈 Historical tracking: ${strategy.enableHistoricalComparison ? 'ENABLED' : 'DISABLED'}`);
         console.log(`   ⏳ WAITING for price drop - will NOT buy until DIP detected`);
         
         this.saveStrategies();
@@ -158,15 +189,17 @@ class StrategyBuilder extends EventEmitter {
             // Get current price using HoldStation SDK
             const currentPrice = await this.getCurrentPrice(strategy.targetToken);
             
-            // Store price in history
-            const priceHistory = this.priceHistory.get(strategy.targetToken);
+            // Store price in enhanced history
+            const priceHistoryData = this.priceHistory.get(strategy.targetToken);
+            const priceHistory = priceHistoryData.prices;
+            
             priceHistory.push({
                 timestamp: Date.now(),
                 price: currentPrice
             });
             
-            // Keep only relevant history (based on dipTimeframe)
-            const cutoffTime = Date.now() - strategy.dipTimeframe;
+            // Clean old history (keep maxHistoryAge for historical analysis)
+            const cutoffTime = Date.now() - priceHistoryData.maxHistoryAge;
             while (priceHistory.length > 0 && priceHistory[0].timestamp < cutoffTime) {
                 priceHistory.shift();
             }
@@ -180,7 +213,7 @@ class StrategyBuilder extends EventEmitter {
                     await this.checkPositionForProfit(strategy, position);
                 }
             } else {
-                // Look for DIP buying opportunities
+                // Look for DIP buying opportunities with enhanced analysis
                 await this.checkForDipOpportunity(strategy, priceHistory, currentPrice);
             }
             
@@ -189,13 +222,22 @@ class StrategyBuilder extends EventEmitter {
                 const timeRunning = Math.floor((Date.now() - activeState.startTime) / 1000);
                 
                 if (openPositions.length === 0) {
-                    // Show brief DIP waiting status
+                    // Show enhanced DIP waiting status
                     if (priceHistory.length >= 2) {
-                        const highestPrice = Math.max(...priceHistory.map(p => p.price));
+                        // Get prices for the specific DIP timeframe
+                        const dipTimeframePrices = this.getPricesInTimeframe(priceHistory, strategy.dipTimeframe);
+                        const highestPrice = Math.max(...dipTimeframePrices.map(p => p.price));
                         const currentDrop = ((highestPrice - currentPrice) / highestPrice) * 100;
                         const dipTriggerPrice = highestPrice * (1 - strategy.dipThreshold / 100);
                         
-                        console.log(`⏳ ${strategy.name}: Waiting for DIP | Current: ${currentPrice.toFixed(8)} | Need: ≤${dipTriggerPrice.toFixed(8)} | Drop: ${currentDrop.toFixed(2)}%/${strategy.dipThreshold}% | Runtime: ${timeRunning}s`);
+                        // Add historical context if enabled
+                        let historicalContext = '';
+                        if (strategy.enableHistoricalComparison && priceHistory.length > 10) {
+                            const historical = this.getHistoricalPriceAnalysis(priceHistory, currentPrice, strategy.historicalTimeframes);
+                            historicalContext = ` | ${historical.summary}`;
+                        }
+                        
+                        console.log(`⏳ ${strategy.name}: Waiting for DIP | Current: ${currentPrice.toFixed(8)} | Need: ≤${dipTriggerPrice.toFixed(8)} | Drop: ${currentDrop.toFixed(2)}%/${strategy.dipThreshold}% (${strategy.dipTimeframeLabel})${historicalContext} | Runtime: ${timeRunning}s`);
                     } else {
                         console.log(`📊 ${strategy.name}: Building price history (${priceHistory.length}/2) | Current: ${currentPrice.toFixed(8)} WLD | Runtime: ${timeRunning}s`);
                     }
@@ -303,6 +345,88 @@ class StrategyBuilder extends EventEmitter {
         }
     }
     
+    // Helper method to get prices within a specific timeframe
+    getPricesInTimeframe(priceHistory, timeframeMs) {
+        const cutoffTime = Date.now() - timeframeMs;
+        return priceHistory.filter(p => p.timestamp >= cutoffTime);
+    }
+    
+    // Helper method to format time ago
+    formatTimeAgo(timestamp) {
+        const seconds = Math.floor((Date.now() - timestamp) / 1000);
+        
+        if (seconds < 60) return `${seconds}s ago`;
+        
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        
+        const days = Math.floor(hours / 24);
+        return `${days}d ago`;
+    }
+    
+    // Get historical price analysis for multiple timeframes
+    getHistoricalPriceAnalysis(priceHistory, currentPrice, timeframes) {
+        const analysis = {
+            periods: {},
+            summary: '',
+            recommendations: []
+        };
+        
+        for (const [period, timeframeMs] of Object.entries(timeframes)) {
+            const periodPrices = this.getPricesInTimeframe(priceHistory, timeframeMs);
+            
+            if (periodPrices.length > 0) {
+                const prices = periodPrices.map(p => p.price);
+                const highest = Math.max(...prices);
+                const lowest = Math.min(...prices);
+                const average = prices.reduce((a, b) => a + b, 0) / prices.length;
+                
+                const dropFromHigh = ((highest - currentPrice) / highest) * 100;
+                const riseFromLow = ((currentPrice - lowest) / lowest) * 100;
+                const vsAverage = ((currentPrice - average) / average) * 100;
+                
+                analysis.periods[period] = {
+                    highest,
+                    lowest,
+                    average,
+                    dropFromHigh,
+                    riseFromLow,
+                    vsAverage,
+                    dataPoints: periodPrices.length
+                };
+                
+                // Generate recommendations
+                if (dropFromHigh > 10) {
+                    analysis.recommendations.push(`Strong DIP vs ${period} high (-${dropFromHigh.toFixed(1)}%)`);
+                }
+                if (riseFromLow < 5) {
+                    analysis.recommendations.push(`Near ${period} low (+${riseFromLow.toFixed(1)}%)`);
+                }
+            }
+        }
+        
+        // Create summary
+        const mainPeriods = ['5min', '1hour', '6hour'];
+        const summaryParts = [];
+        
+        for (const period of mainPeriods) {
+            if (analysis.periods[period]) {
+                const data = analysis.periods[period];
+                if (Math.abs(data.vsAverage) > 2) {
+                    const direction = data.vsAverage > 0 ? '+' : '';
+                    summaryParts.push(`${period}:${direction}${data.vsAverage.toFixed(1)}%`);
+                }
+            }
+        }
+        
+        analysis.summary = summaryParts.length > 0 ? summaryParts.join(' ') : 'Near averages';
+        
+        return analysis;
+    }
+    
     // Get current price for a token (WLD per token)
     async getCurrentPrice(tokenAddress) {
         if (this.sinclaveEngine) {
@@ -368,20 +492,29 @@ class StrategyBuilder extends EventEmitter {
             console.log(`   📉 This will IMPROVE our average price - good DIP buy opportunity!`);
         }
         
-        // Find the highest price in the timeframe
-        const highestPrice = Math.max(...priceHistory.map(p => p.price));
+        // Get prices within the specific DIP detection timeframe
+        const dipTimeframePrices = this.getPricesInTimeframe(priceHistory, strategy.dipTimeframe);
         
-        // Calculate percentage drop from highest price
+        if (dipTimeframePrices.length === 0) {
+            return; // No prices in timeframe yet
+        }
+        
+        // Find the highest price in the DIP detection timeframe
+        const highestPrice = Math.max(...dipTimeframePrices.map(p => p.price));
+        const highestPriceTime = dipTimeframePrices.find(p => p.price === highestPrice).timestamp;
+        
+        // Calculate percentage drop from highest price in timeframe
         const priceDrop = ((highestPrice - currentPrice) / highestPrice) * 100;
         
         if (priceDrop >= strategy.dipThreshold) {
             console.log(`\n🚨 DIP DETECTED for ${strategy.name}!`);
             console.log(`════════════════════════════════════════════════════════════`);
-            console.log(`   📊 DIP Analysis:`);
-            console.log(`      📈 Highest Price (${strategy.dipTimeframe/1000}s): ${highestPrice.toFixed(8)} WLD`);
+            console.log(`   📊 DIP Analysis (${strategy.dipTimeframeLabel} timeframe):`);
+            console.log(`      📈 Highest Price: ${highestPrice.toFixed(8)} WLD (${this.formatTimeAgo(highestPriceTime)})`);
             console.log(`      📉 Current Price: ${currentPrice.toFixed(8)} WLD`);
             console.log(`      📊 Price Drop: ${priceDrop.toFixed(2)}% (Target: ${strategy.dipThreshold}%)`);
             console.log(`      🎯 DIP Trigger: ${(highestPrice * (1 - strategy.dipThreshold / 100)).toFixed(8)} WLD`);
+            console.log(`      📋 Data Points: ${dipTimeframePrices.length} prices in ${strategy.dipTimeframeLabel}`);
             
             if (averagePrice) {
                 const avgComparison = ((currentPrice - averagePrice) / averagePrice) * 100;

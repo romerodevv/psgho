@@ -1,0 +1,146 @@
+🎯 WorldChain Trading Bot V2.4 - Enhanced DIP Detection
+═══════════════════════════════════════════════════════════
+
+🚀 MAJOR NEW FEATURES:
+
+⏱️ CONFIGURABLE DIP TIMEFRAMES
+• Choose 1min, 5min, 15min, 1hour, or custom timeframes
+• Precise DIP detection from highest price in your selected period
+• No more false triggers from brief price movements
+
+📊 HISTORICAL PRICE ANALYSIS  
+• Compare current price vs 5min, 1hour, 6hour, 24hour, 7day averages
+• Advanced market context for better decision making
+• Optional feature for experienced traders
+
+🎯 ENHANCED MONITORING
+• Detailed DIP analysis with exact trigger prices
+• Real-time historical context in status updates
+• Transparent decision logic with timestamps
+
+💡 SMART EXAMPLES:
+• 5min timeframe + 10% DIP = Buy when price drops 10% from 5min high
+• 1hour timeframe + 20% DIP = Buy when price drops 20% from 1hour high
+• Historical analysis shows: "5min:-2.1% 1hour:+5.3% 6hour:-8.7%"
+
+═══════════════════════════════════════════════════════════
+
+📥 QUICK DOWNLOAD & INSTALL:
+
+wget https://github.com/your-repo/worldchain-bot/releases/download/v2.4/worldchain-bot-ultrafast-v2.4.tar.gz
+tar -xzf worldchain-bot-ultrafast-v2.4.tar.gz
+cd worldchain-bot-ultrafast-v2.4
+chmod +x simple-install.sh
+./simple-install.sh
+
+═══════════════════════════════════════════════════════════
+
+📦 PACKAGE CONTENTS:
+
+CORE FILES:
+• worldchain-trading-bot.js (Enhanced main interface)
+• strategy-builder.js (New configurable DIP system)  
+• sinclave-enhanced-engine.js (Ultra-fast execution)
+• trading-strategy.js (Smart average price protection)
+• token-discovery.js (Comprehensive token finding)
+• trading-engine.js (Multi-DEX support)
+
+INSTALLATION:
+• simple-install.sh (One-command setup)
+• basic-install.sh (Minimal installation)
+• fix-system.sh (System repair utility)
+
+DOCUMENTATION:
+• ENHANCED_DIP_DETECTION_V2.4.md (Complete feature guide)
+• README.md (Full documentation)
+• PERFORMANCE_OPTIMIZATIONS.md (Speed improvements)
+
+═══════════════════════════════════════════════════════════
+
+🎯 NEW STRATEGY CREATION WORKFLOW:
+
+1. Select Strategy Builder from main menu
+2. Choose "Create New Strategy"
+3. Select trading pair (ORO, YIELD, Ramen, or discovered tokens)
+4. Set DIP threshold % (e.g., 10% for 10% drop)
+5. Set profit target % (e.g., 5% for 5% gain)
+6. Choose DIP timeframe:
+   • 1 minute (fast, volatile tokens)
+   • 5 minutes (balanced, recommended)  
+   • 15 minutes (stable tokens)
+   • 1 hour (long-term DIP detection)
+   • Custom (specify your own)
+7. Enable historical analysis (optional)
+8. Start strategy and monitor enhanced status updates
+
+═══════════════════════════════════════════════════════════
+
+📊 ENHANCED MONITORING EXAMPLE:
+
+⏳ YIELD_Strategy: Waiting for DIP | Current: 0.00316426 | 
+Need: ≤0.00285000 | Drop: 8.2%/10% (5min) | 
+5min:-2.1% 1hour:+5.3% 6hour:-8.7% | Runtime: 180s
+
+This shows:
+• Current price: 0.00316426 WLD per token
+• Need price ≤ 0.00285000 for 10% DIP trigger  
+• Currently 8.2% drop from 5min high (need 10%)
+• Price is 2.1% below 5min average
+• Price is 5.3% above 1hour average
+• Price is 8.7% below 6hour average
+
+═══════════════════════════════════════════════════════════
+
+⚡ PERFORMANCE TARGETS:
+
+• Trade execution: <2000ms (ULTRA-FAST)
+• Price monitoring: Every 30 seconds
+• DIP detection: Real-time with configurable precision
+• Historical analysis: 7-day price database
+• System response: <100ms for status updates
+
+═══════════════════════════════════════════════════════════
+
+🔧 SYSTEM REQUIREMENTS:
+
+• Linux (Ubuntu 20.04+, Debian 11+, CentOS 8+)
+• Node.js 18+ (auto-installed)
+• 2GB RAM minimum, 4GB recommended
+• 1GB storage for price history
+• Stable internet connection
+
+═══════════════════════════════════════════════════════════
+
+🆕 WHAT'S NEW IN V2.4:
+
+✅ Configurable DIP timeframes (1min to 24hours)
+✅ Historical price analysis across multiple periods
+✅ Enhanced monitoring with exact trigger prices
+✅ Improved strategy creation workflow
+✅ Better price history management
+✅ More precise DIP detection logic
+✅ Advanced market context display
+✅ Transparent decision logging
+
+═══════════════════════════════════════════════════════════
+
+🚀 ALTERNATIVE INSTALLERS:
+
+NOVICE TRADERS:
+wget -O install.sh https://raw.githubusercontent.com/your-repo/worldchain-bot/main/novice-ultrafast-installer.sh && bash install.sh
+
+ADVANCED USERS:  
+git clone https://github.com/your-repo/worldchain-bot.git
+cd worldchain-bot && npm install
+
+SYSTEM REPAIR:
+wget https://raw.githubusercontent.com/your-repo/worldchain-bot/main/fix-system.sh && sudo bash fix-system.sh
+
+═══════════════════════════════════════════════════════════
+
+🎯 READY TO EXPERIENCE PRECISION DIP TRADING?
+
+Download V2.4 now and start using configurable timeframes for 
+smarter, more precise DIP detection strategies!
+
+═══════════════════════════════════════════════════════════

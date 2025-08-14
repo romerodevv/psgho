@@ -2354,6 +2354,57 @@ class WorldchainTradingBot {
             const profitTarget = parseFloat(await this.getUserInput('Profit Target % (e.g., 3 for 3% profit): '));
             const tradeAmount = parseFloat(await this.getUserInput('Trade Amount in WLD (e.g., 0.1): '));
             const maxSlippage = parseFloat(await this.getUserInput('Max Slippage % (e.g., 1 for 1%): ') || '1');
+            
+            // Enhanced DIP timeframe configuration
+            console.log('\n⏱️ DIP Detection Timeframe:');
+            console.log('1. 1 minute (fast, good for volatile tokens)');
+            console.log('2. 5 minutes (balanced, recommended)');
+            console.log('3. 15 minutes (slower, good for stable tokens)');
+            console.log('4. 1 hour (long-term DIP detection)');
+            console.log('5. Custom (specify your own)');
+            
+            const timeframeChoice = await this.getUserInput('Select DIP detection timeframe (1-5): ');
+            let dipTimeframe = 300000; // Default 5 minutes
+            let dipTimeframeLabel = '5min';
+            
+            switch (timeframeChoice) {
+                case '1':
+                    dipTimeframe = 60000; // 1 minute
+                    dipTimeframeLabel = '1min';
+                    break;
+                case '2':
+                    dipTimeframe = 300000; // 5 minutes
+                    dipTimeframeLabel = '5min';
+                    break;
+                case '3':
+                    dipTimeframe = 900000; // 15 minutes
+                    dipTimeframeLabel = '15min';
+                    break;
+                case '4':
+                    dipTimeframe = 3600000; // 1 hour
+                    dipTimeframeLabel = '1h';
+                    break;
+                case '5':
+                    const customMinutes = parseFloat(await this.getUserInput('Enter timeframe in minutes (e.g., 10): '));
+                    if (!isNaN(customMinutes) && customMinutes > 0 && customMinutes <= 1440) {
+                        dipTimeframe = customMinutes * 60000;
+                        dipTimeframeLabel = customMinutes >= 60 ? `${customMinutes/60}h` : `${customMinutes}min`;
+                    } else {
+                        console.log('❌ Invalid timeframe. Using default 5 minutes.');
+                    }
+                    break;
+                default:
+                    console.log('❌ Invalid choice. Using default 5 minutes.');
+            }
+            
+            // Historical price comparison option
+            console.log('\n📊 Historical Price Comparison (Advanced):');
+            const enableHistorical = await this.getUserInput('Enable historical price analysis? (y/N): ');
+            const enableHistoricalComparison = enableHistorical.toLowerCase().startsWith('y');
+            
+            if (enableHistoricalComparison) {
+                console.log('✅ Historical analysis enabled - strategy will compare prices across multiple timeframes.');
+            }
 
             // Validation
             if (isNaN(dipThreshold) || dipThreshold <= 0 || dipThreshold > 50) {
@@ -2374,30 +2425,33 @@ class WorldchainTradingBot {
                 return;
             }
 
-            // Create strategy
+            // Create strategy with enhanced configuration
             const strategyConfig = {
                 name: name.trim(),
                 baseToken: this.WLD_ADDRESS,
                 targetToken,
-                targetTokenSymbol: tokenInfo.symbol,
+                tokenSymbol: tokenInfo.symbol,
                 targetTokenName: tokenInfo.name,
                 dipThreshold,
                 profitTarget,
                 tradeAmount,
                 maxSlippage,
-                priceCheckInterval: 5000, // 5 seconds
-                dipTimeframe: 60000 // 1 minute for DIP detection
+                priceCheckInterval: 30000, // 30 seconds for responsive monitoring
+                dipTimeframe,
+                enableHistoricalComparison
             };
 
             const strategyId = await this.strategyBuilder.createStrategy(strategyConfig);
 
             console.log(`\n✅ Custom strategy created successfully!`);
-            console.log(`📋 Strategy ID: ${strategyId}`);
+            console.log(`📋 Strategy ID: ${strategyId.id}`);
             console.log(`📊 Name: ${name}`);
             console.log(`💱 Pair: WLD → ${tokenInfo.symbol} (${tokenInfo.name})`);
-            console.log(`📉 DIP Threshold: ${dipThreshold}%`);
+            console.log(`📉 DIP Threshold: ${dipThreshold}% drop from highest in ${dipTimeframeLabel}`);
             console.log(`📈 Profit Target: ${profitTarget}%`);
             console.log(`💰 Trade Amount: ${tradeAmount} WLD`);
+            console.log(`⏱️ Monitoring: Every 30s, DIP detection over ${dipTimeframeLabel}`);
+            console.log(`📊 Historical Analysis: ${enableHistoricalComparison ? 'ENABLED' : 'DISABLED'}`);
             console.log(`\n🎯 AVERAGE PRICE STRATEGY BEHAVIOR:`);
             console.log(`   1️⃣ Monitor ${tokenInfo.symbol} price continuously`);
             console.log(`   2️⃣ WAIT for ${dipThreshold}% price drop (DIP)`);
