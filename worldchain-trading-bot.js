@@ -2259,6 +2259,13 @@ class WorldchainTradingBot {
         console.clear();
         console.log('➕ CREATE NEW CUSTOM STRATEGY');
         console.log('════════════════════════════════════════════════════════════');
+        console.log('🎯 DIP STRATEGY EXPLANATION:');
+        console.log('   • Strategy monitors token price continuously');
+        console.log('   • WAITS for price to drop by your DIP threshold %');
+        console.log('   • BUYS tokens only when DIP is detected');
+        console.log('   • SELLS back to WLD when profit target is reached');
+        console.log('   • Does NOT buy immediately when started!');
+        console.log('════════════════════════════════════════════════════════════');
 
         try {
             // Get strategy configuration
@@ -2342,6 +2349,11 @@ class WorldchainTradingBot {
             console.log(`📉 DIP Threshold: ${dipThreshold}%`);
             console.log(`📈 Profit Target: ${profitTarget}%`);
             console.log(`💰 Trade Amount: ${tradeAmount} WLD`);
+            console.log(`\n🎯 STRATEGY BEHAVIOR:`);
+            console.log(`   1️⃣ Monitor ${tokenInfo.symbol} price continuously`);
+            console.log(`   2️⃣ WAIT for ${dipThreshold}% price drop (DIP)`);
+            console.log(`   3️⃣ BUY ${tradeAmount} WLD → ${tokenInfo.symbol} when DIP detected`);
+            console.log(`   4️⃣ SELL back to WLD when ${profitTarget}% profit reached`);
 
         } catch (error) {
             console.log(`❌ Error creating strategy: ${error.message}`);
@@ -2418,8 +2430,13 @@ class WorldchainTradingBot {
         try {
             await this.strategyBuilder.startStrategy(strategy.id, walletObject);
             console.log(`\n✅ Strategy "${strategy.name}" started successfully!`);
-            console.log(`🔄 Monitoring ${strategy.targetTokenSymbol} for DIP opportunities...`);
-            console.log(`📈 Will sell when profit target of ${strategy.profitTarget}% is reached.`);
+            console.log(`\n🎯 STRATEGY IS NOW ACTIVE:`);
+            console.log(`   🔍 Monitoring ${strategy.targetTokenSymbol} price every 5 seconds`);
+            console.log(`   📉 Waiting for ${strategy.dipThreshold}% price drop to BUY`);
+            console.log(`   💰 Will trade ${strategy.tradeAmount} WLD when DIP detected`);
+            console.log(`   📈 Will sell back to WLD at ${strategy.profitTarget}% profit`);
+            console.log(`\n⚠️  IMPORTANT: Strategy will NOT buy immediately!`);
+            console.log(`   It waits for the DIP threshold to be reached first.`);
         } catch (error) {
             console.log(`❌ Error starting strategy: ${error.message}`);
         }

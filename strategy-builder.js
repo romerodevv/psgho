@@ -115,6 +115,7 @@ class StrategyBuilder extends EventEmitter {
         console.log(`🚀 Started strategy: ${strategy.name}`);
         console.log(`   🔄 Monitoring every ${strategy.priceCheckInterval / 1000} seconds`);
         console.log(`   📊 Looking for ${strategy.dipThreshold}% DIP in ${strategy.dipTimeframe / 1000}s timeframe`);
+        console.log(`   ⏳ WAITING for price drop - will NOT buy until DIP detected`);
         
         this.saveStrategies();
         return strategy;
@@ -189,6 +190,23 @@ class StrategyBuilder extends EventEmitter {
                 console.log(`   🔄 Checks: ${activeState.checksPerformed}`);
                 console.log(`   💰 Positions: ${openPositions.length} open`);
                 console.log(`   📈 Current Price: ${currentPrice.toFixed(8)} WLD per token`);
+                
+                if (openPositions.length === 0) {
+                    // Calculate how far we are from DIP threshold
+                    if (priceHistory.length >= 2) {
+                        const highestPrice = Math.max(...priceHistory.map(p => p.price));
+                        const currentDrop = ((highestPrice - currentPrice) / highestPrice) * 100;
+                        const remainingDrop = strategy.dipThreshold - currentDrop;
+                        
+                        if (remainingDrop > 0) {
+                            console.log(`   📉 Need ${remainingDrop.toFixed(2)}% more drop for DIP buy (${currentDrop.toFixed(2)}% / ${strategy.dipThreshold}%)`);
+                        } else {
+                            console.log(`   ⚠️ DIP threshold reached but no buy executed - checking conditions...`);
+                        }
+                    } else {
+                        console.log(`   📊 Building price history... (${priceHistory.length}/2 points)`);
+                    }
+                }
             }
             
         } catch (error) {
@@ -394,6 +412,12 @@ class StrategyBuilder extends EventEmitter {
     // Get all strategies
     getAllStrategies() {
         return Array.from(this.customStrategies.values());
+    }
+    
+    // Check if a strategy is active
+    isStrategyActive(strategyId) {
+        const strategy = this.customStrategies.get(strategyId);
+        return strategy && strategy.isActive === true;
     }
     
     // Get strategy by ID
