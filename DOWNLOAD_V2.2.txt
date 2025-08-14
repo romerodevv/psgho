@@ -1,0 +1,117 @@
+🚀 WORLDCHAIN TRADING BOT V2.2 - ULTRA-FAST EDITION
+═══════════════════════════════════════════════════════════
+
+📥 DOWNLOAD LATEST VERSION:
+wget https://github.com/romerodevv/psgho/raw/main/worldchain-bot-ultrafast-v2.2.tar.gz
+
+🎯 MAJOR IMPROVEMENTS IN V2.2:
+
+✅ FIXED CRITICAL ISSUES:
+   • Strategy Builder Menu fully functional (no more crashes)
+   • Position tracking fixed - properly monitors WLD→TOKEN→WLD lifecycle
+   • currentPrice undefined errors resolved
+   • Race condition fixes for position management
+
+🚀 ULTRA-FAST EXECUTION OPTIMIZATIONS:
+   • Target execution time: <2000ms (ULTRA-FAST)
+   • Aggressive gas settings: 0.005 gwei base + 50% boost
+   • No approval confirmation wait - immediate swap execution
+   • Enhanced gas limits: 350,000 for guaranteed inclusion
+   • Streamlined logging during critical execution paths
+
+🎯 DIP STRATEGY CLARIFICATIONS:
+   • Strategy Builder now clearly explains DIP behavior
+   • Enhanced user interface with step-by-step explanations
+   • Real-time progress tracking showing % to DIP threshold
+   • Clear messaging: "Strategy waits for DIP before buying!"
+
+🏗️ STRATEGY BUILDER ENHANCEMENTS:
+   • Complete custom DIP/Profit strategy management
+   • View, create, start, stop, delete strategies
+   • Real-time monitoring with detailed status updates
+   • Strategy statistics and performance tracking
+
+📊 ENHANCED DEBUGGING:
+   • Detailed position lifecycle logging
+   • Clear error messages with troubleshooting steps
+   • Position lock status monitoring
+   • Price history tracking with DIP detection feedback
+
+═══════════════════════════════════════════════════════════
+
+📦 QUICK INSTALLATION:
+
+1. DOWNLOAD & EXTRACT:
+   wget https://github.com/romerodevv/psgho/raw/main/worldchain-bot-ultrafast-v2.2.tar.gz
+   tar -xzf worldchain-bot-ultrafast-v2.2.tar.gz
+   cd worldchain-bot-ultrafast-v2.2/
+
+2. INSTALL DEPENDENCIES:
+   npm install
+
+3. CONFIGURE:
+   cp .env.example .env
+   nano .env  # Add your private key and RPC endpoint
+
+4. START BOT:
+   node worldchain-trading-bot.js
+
+═══════════════════════════════════════════════════════════
+
+🎯 NEW STRATEGY BUILDER WORKFLOW:
+
+1. Select option 5 from main menu: "Strategy Builder"
+2. Create new strategy with your preferred:
+   - Token pair (from discovered tokens)
+   - DIP threshold (e.g., 15% price drop)
+   - Profit target (e.g., 3% profit)
+   - Trade amount (e.g., 0.1 WLD)
+3. Start strategy - it will WAIT for DIP before buying
+4. Monitor real-time progress and position management
+5. Automatic sell when profit target reached
+
+⚠️  IMPORTANT: DIP strategies do NOT buy immediately!
+   They monitor prices and wait for the specified drop.
+
+═══════════════════════════════════════════════════════════
+
+🚀 PERFORMANCE TARGETS:
+   🚀 <2000ms = ULTRA-FAST (Excellent!)
+   ⚡ <4000ms = FAST (Good)
+   ⏳ <8000ms = STANDARD
+   🐌 >8000ms = SLOW (Needs optimization)
+
+💡 FEATURES:
+   • Ultra-fast trade execution (<2000ms target)
+   • Complete Strategy Builder with DIP/Profit automation
+   • Enhanced position tracking and monitoring
+   • Color-coded P&L display (green profits, red losses)
+   • HoldStation SDK integration for optimal routing
+   • Comprehensive debugging and error handling
+
+═══════════════════════════════════════════════════════════
+
+🔧 ALTERNATIVE INSTALLERS:
+
+NOVICE (Auto-install everything):
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/novice-ultrafast-installer.sh | bash
+
+SIMPLE (Basic setup):
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/simple-install.sh | bash
+
+BASIC (Minimal):
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/basic-install.sh | bash
+
+═══════════════════════════════════════════════════════════
+
+📋 CHANGELOG V2.2:
+• Fixed Strategy Builder menu crashes
+• Resolved position tracking issues
+• Ultra-fast execution optimizations
+• Enhanced DIP strategy explanations
+• Improved error handling and debugging
+• Real-time progress monitoring
+• Color-coded profit/loss display
+• Enhanced gas optimization strategies
+
+🎯 Perfect for automated DIP buying and profit-taking strategies!
