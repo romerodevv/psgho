@@ -79,9 +79,40 @@ class StrategyBuilder extends EventEmitter {
             createdAt: Date.now(),
             lastExecuted: null,
             
-            // Auto-sell tracking
-            priceAboveAverageCount: 0, // Count how long price stays above average
-            priceAboveAverageThreshold: 5, // Auto-sell after 5 consecutive checks above average
+            // Smart volatility management
+            volatilityProfile: 'normal', // 'low', 'normal', 'high', 'extreme'
+            priceHistory: [], // Store recent price history for volatility analysis
+            maxHistoryLength: 50, // Keep last 50 price points
+            lastVolatilityCheck: 0,
+            
+            // Smart DIP buying thresholds (adaptive based on volatility)
+            smartDipThresholds: {
+                small: config.dipThreshold || 15,      // 15% - normal dip
+                medium: (config.dipThreshold || 15) * 2, // 30% - significant dip  
+                large: (config.dipThreshold || 15) * 3,  // 45% - major dip
+                extreme: (config.dipThreshold || 15) * 4 // 60% - extreme dip
+            },
+            
+            // Smart SELL thresholds (adaptive based on volatility)
+            smartSellThresholds: {
+                quick: strategy.profitRangeMin * 0.5,    // 50% of target - quick profit
+                normal: strategy.profitRangeMin,         // 100% of target - normal profit
+                good: strategy.profitRangeMin * 2,       // 200% of target - good profit
+                excellent: strategy.profitRangeMin * 5,  // 500% of target - excellent profit
+                extreme: strategy.profitRangeMin * 10    // 1000% of target - extreme profit
+            },
+            
+            // Position sizing based on dip severity
+            smartPositionSizing: {
+                small: config.tradeAmount * 0.5,        // 50% size for small dips
+                medium: config.tradeAmount * 1.0,       // 100% size for medium dips
+                large: config.tradeAmount * 1.5,        // 150% size for large dips
+                extreme: config.tradeAmount * 2.0       // 200% size for extreme dips
+            },
+            
+            // Volatility tracking
+            priceAboveAverageCount: 0,
+            priceAboveAverageThreshold: 5,
             lastPriceCheck: 0,
             
             // Performance tracking
@@ -91,21 +122,31 @@ class StrategyBuilder extends EventEmitter {
             positions: []
         };
         
+        // Initialize smart thresholds
+        this.updateSmartThresholds(strategy);
+        
         this.customStrategies.set(strategyId, strategy);
         this.saveStrategies();
         
-        console.log(`✅ Strategy created: ${strategy.name} (${strategyId})`);
+        console.log(`✅ Smart Strategy Created: ${strategy.name} (${strategyId})`);
         console.log(`   📊 Pair: WLD → ${config.tokenSymbol}`);
-        console.log(`   📉 DIP Trigger: ${config.dipThreshold}% drop from highest in ${strategy.dipTimeframeLabel}`);
+        console.log(`   🧠 Volatility Profile: ${strategy.volatilityProfile} (adaptive)`);
+        console.log(`   📉 Base DIP Trigger: ${config.dipThreshold}% (smart scaling enabled)`);
+        console.log(`   📈 Base Profit Target: ${strategy.profitRangeMin}% (smart scaling enabled)`);
+        console.log(`   💰 Base Trade Amount: ${config.tradeAmount} WLD (smart sizing enabled)`);
+        console.log(`   ⏱️ Price Checks: Every ${strategy.priceCheckInterval / 1000}s`);
+        console.log(`   🚀 Auto-Sell: ENABLED (immediate on profit target)`);
         
         if (strategy.enableProfitRange) {
-            console.log(`   📈 Profit Range: ${strategy.profitRangeMin}% - ${strategy.profitRangeMax}% (${strategy.profitRangeSteps} steps, ${strategy.profitRangeMode} mode)`);
-        } else {
-            console.log(`   📈 Profit Target: ${config.profitTarget}% (simple mode)`);
+            console.log(`   📊 Profit Range Mode: ${strategy.profitRangeMin}% - ${strategy.profitRangeMax}% (${strategy.profitRangeSteps} steps, ${strategy.profitRangeMode})`);
         }
         
-        console.log(`   💰 Trade Amount: ${config.tradeAmount} WLD`);
-        console.log(`   ⏱️ Price Checks: Every ${strategy.priceCheckInterval / 1000}s`);
+        console.log(`🧠 Smart Features Enabled:`);
+        console.log(`   📊 Volatility Analysis: Real-time market adaptation`);
+        console.log(`   📉 Smart DIP Buying: 4-tier system (Small→Medium→Large→Extreme)`);
+        console.log(`   📈 Smart Profit Taking: 5-tier system (Quick→Normal→Good→Excellent→Extreme)`);
+        console.log(`   💰 Dynamic Position Sizing: Adapts to DIP severity`);
+        console.log(`   🛡️ Average Price Protection: Only buys below average`);
         
         return strategy;
     }
@@ -249,8 +290,8 @@ class StrategyBuilder extends EventEmitter {
                     await this.checkPositionForProfit(strategy, position);
                 }
             } else {
-                // Look for DIP buying opportunities with enhanced analysis
-                await this.checkForDipOpportunity(strategy, priceHistory, currentPrice);
+                // Look for smart DIP buying opportunities with volatility analysis
+                await this.checkForSmartDipOpportunity(strategy, priceHistory, currentPrice);
             }
             
             // Brief status update every 2 checks (~10 seconds)
@@ -637,7 +678,70 @@ class StrategyBuilder extends EventEmitter {
         return priceData.price;
     }
     
-    // Check for DIP buying opportunity with AVERAGE PRICE PROTECTION
+    // Check for smart DIP buying opportunity with volatility-based analysis
+    async checkForSmartDipOpportunity(strategy, priceHistory, currentPrice) {
+        if (priceHistory.length < 2) {
+            return; // Need at least 2 price points
+        }
+        
+        // Calculate our current average price from existing positions
+        const openPositions = strategy.positions.filter(p => p.status === 'open');
+        let averagePrice = null;
+        
+        if (openPositions.length > 0) {
+            const totalWLD = openPositions.reduce((sum, pos) => sum + pos.entryAmountWLD, 0);
+            const totalTokens = openPositions.reduce((sum, pos) => sum + pos.entryAmountToken, 0);
+            averagePrice = totalWLD / totalTokens;
+            
+            // SMART AVERAGE PRICE PROTECTION: Only buy if it improves our average
+            if (currentPrice >= averagePrice) {
+                console.log(`   🚫 Smart Protection: Current price (${currentPrice.toFixed(8)}) >= Average (${averagePrice.toFixed(8)})`);
+                console.log(`   📊 Will wait for price below average to improve position`);
+                return;
+            }
+            
+            console.log(`   📉 Smart Opportunity: Current price below average - can improve position!`);
+        }
+        
+        // Get prices within the DIP detection timeframe
+        const dipTimeframePrices = this.getPricesInTimeframe(priceHistory, strategy.dipTimeframe);
+        
+        if (dipTimeframePrices.length === 0) {
+            return; // No prices in timeframe yet
+        }
+        
+        // Find the highest price in the timeframe
+        const highestPrice = Math.max(...dipTimeframePrices.map(p => p.price));
+        const dipPercent = ((highestPrice - currentPrice) / highestPrice) * 100;
+        
+        console.log(`🧠 Smart DIP Analysis:`);
+        console.log(`   📊 Highest in ${strategy.dipTimeframeLabel}: ${highestPrice.toFixed(8)} WLD`);
+        console.log(`   📊 Current Price: ${currentPrice.toFixed(8)} WLD`);
+        console.log(`   📊 DIP Detected: ${dipPercent.toFixed(2)}%`);
+        console.log(`   📊 Volatility Profile: ${strategy.volatilityProfile}`);
+        
+        // Use smart DIP buying logic
+        const position = await this.executeSmartDipBuy(strategy, currentPrice, dipPercent);
+        
+        if (position) {
+            console.log(`✅ Smart DIP buy completed! Position: ${position.id}`);
+            
+            // Update average price if we had existing positions
+            if (averagePrice && openPositions.length > 0) {
+                const newTotalWLD = openPositions.reduce((sum, pos) => sum + pos.entryAmountWLD, 0) + position.entryAmountWLD;
+                const newTotalTokens = openPositions.reduce((sum, pos) => sum + pos.entryAmountToken, 0) + position.entryAmountToken;
+                const newAveragePrice = newTotalWLD / newTotalTokens;
+                const improvement = ((averagePrice - newAveragePrice) / averagePrice) * 100;
+                
+                console.log(`📊 Average Price Improvement:`);
+                console.log(`   📈 Previous Average: ${averagePrice.toFixed(8)} WLD`);
+                console.log(`   📉 New Average: ${newAveragePrice.toFixed(8)} WLD`);
+                console.log(`   ✅ Improvement: ${improvement.toFixed(2)}%`);
+            }
+        }
+    }
+    
+    // Legacy DIP opportunity check (kept for compatibility)
     async checkForDipOpportunity(strategy, priceHistory, currentPrice) {
         if (priceHistory.length < 2) {
             return; // Need at least 2 price points
@@ -908,6 +1012,9 @@ class StrategyBuilder extends EventEmitter {
                 return;
             }
             
+            // Analyze volatility and update smart thresholds
+            this.analyzeVolatility(strategy, currentPrice);
+            
             // Initialize profit range tracking if not exists
             if (!strategy.profitRangeState) {
                 strategy.profitRangeState = {
@@ -940,47 +1047,18 @@ class StrategyBuilder extends EventEmitter {
             console.log(`   📈 Current Value: ${(totalTokens * currentPrice).toFixed(6)} WLD`);
             console.log(`   💹 Unrealized P&L: ${unrealizedPnLPercent.toFixed(2)}%`);
             
-            // Check profit levels and execute appropriate auto-sell strategy
-            if (unrealizedPnLPercent >= strategy.profitRangeMin) {
+            // Smart profit selling based on volatility-adjusted thresholds
+            const smartSell = this.analyzeSmartSellOpportunity(strategy, unrealizedPnLPercent);
+            
+            if (smartSell.shouldSell) {
+                console.log(`🧠 Smart Sell Analysis: ${smartSell.level.toUpperCase()} PROFIT DETECTED!`);
+                console.log(`   📊 Volatility Profile: ${strategy.volatilityProfile}`);
+                console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}%`);
+                console.log(`   📊 Sell Threshold: ${smartSell.threshold.toFixed(2)}%`);
+                console.log(`   📊 Profit Level: ${smartSell.level.toUpperCase()}`);
+                console.log(`   🚀 ${smartSell.urgency.toUpperCase()} PRIORITY AUTO-SELL!`);
                 
-                // EXTREME PROFIT JUMP - Sell immediately if profit is 10x or more than target
-                if (unrealizedPnLPercent >= strategy.profitRangeMin * 10) {
-                    console.log(`🚨🚨 EXTREME PROFIT JUMP DETECTED! 🚨🚨`);
-                    console.log(`   📊 Target Profit: ${strategy.profitRangeMin}%`);
-                    console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (${(unrealizedPnLPercent / strategy.profitRangeMin).toFixed(1)}x target!)`);
-                    console.log(`   🚀 EMERGENCY PROFIT TAKING - SELLING ALL IMMEDIATELY!`);
-                    
-                    await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'extreme_profit_jump');
-                }
-                // VERY HIGH PROFIT - Sell immediately if profit is 5x or more than target  
-                else if (unrealizedPnLPercent >= strategy.profitRangeMin * 5) {
-                    console.log(`🚨 VERY HIGH PROFIT DETECTED! 🚨`);
-                    console.log(`   📊 Target Profit: ${strategy.profitRangeMin}%`);
-                    console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (${(unrealizedPnLPercent / strategy.profitRangeMin).toFixed(1)}x target!)`);
-                    console.log(`   🚀 HIGH PROFIT AUTO-SELL - SELLING ALL IMMEDIATELY!`);
-                    
-                    await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'high_profit_exceeded');
-                }
-                // MODERATE EXCESS PROFIT - Sell if profit is 3x or more than target
-                else if (unrealizedPnLPercent >= strategy.profitRangeMin * 3) {
-                    console.log(`⚡ PROFIT SIGNIFICANTLY EXCEEDED TARGET! ⚡`);
-                    console.log(`   📊 Target Profit: ${strategy.profitRangeMin}%`);
-                    console.log(`   📊 Current Profit: ${unrealizedPnLPercent.toFixed(2)}% (${(unrealizedPnLPercent / strategy.profitRangeMin).toFixed(1)}x target!)`);
-                    console.log(`   🚀 EXCESS PROFIT AUTO-SELL - SELLING ALL IMMEDIATELY!`);
-                    
-                    await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'excess_profit');
-                }
-                // NORMAL PROFIT TARGET REACHED - Standard auto-sell
-                else {
-                    console.log(`🎯 PROFIT TARGET REACHED for ${strategy.name}! AUTO-SELLING ALL POSITIONS...`);
-                    console.log(`   📊 Average Price: ${averagePrice.toFixed(8)} WLD`);
-                    console.log(`   📊 Current Price: ${currentPrice.toFixed(8)} WLD`);
-                    console.log(`   📊 Profit Target: ${strategy.profitRangeMin}% (${minPrice.toFixed(8)} WLD)`);
-                    console.log(`   💹 Current Profit: ${unrealizedPnLPercent.toFixed(2)}%`);
-                    console.log(`   🚀 EXECUTING STANDARD AUTO-SELL!`);
-                    
-                    await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, 'profit_target_reached');
-                }
+                await this.executeImmediateProfitSell(strategy, openPositions, currentPrice, unrealizedPnLPercent, smartSell.reason);
             } else {
                 // Show how close we are to profit range
                 const progressToRange = ((currentPrice - averagePrice) / (minPrice - averagePrice)) * 100;
@@ -1111,6 +1189,327 @@ class StrategyBuilder extends EventEmitter {
             
         } catch (error) {
             console.error(`❌ Error executing profit range step:`, error.message);
+        }
+    }
+    
+    // Analyze market volatility and update strategy profile
+    analyzeVolatility(strategy, currentPrice) {
+        try {
+            // Add current price to history
+            strategy.priceHistory.push({
+                price: currentPrice,
+                timestamp: Date.now()
+            });
+            
+            // Keep only recent history
+            if (strategy.priceHistory.length > strategy.maxHistoryLength) {
+                strategy.priceHistory = strategy.priceHistory.slice(-strategy.maxHistoryLength);
+            }
+            
+            // Need at least 10 data points for analysis
+            if (strategy.priceHistory.length < 10) {
+                return strategy.volatilityProfile;
+            }
+            
+            // Calculate price changes and volatility
+            const prices = strategy.priceHistory.map(h => h.price);
+            const priceChanges = [];
+            
+            for (let i = 1; i < prices.length; i++) {
+                const change = ((prices[i] - prices[i-1]) / prices[i-1]) * 100;
+                priceChanges.push(Math.abs(change));
+            }
+            
+            // Calculate average volatility
+            const avgVolatility = priceChanges.reduce((sum, change) => sum + change, 0) / priceChanges.length;
+            const maxChange = Math.max(...priceChanges);
+            const recentChanges = priceChanges.slice(-5); // Last 5 changes
+            const recentAvgVolatility = recentChanges.reduce((sum, change) => sum + change, 0) / recentChanges.length;
+            
+            // Determine volatility profile
+            let newProfile = 'normal';
+            
+            if (maxChange > 100 || recentAvgVolatility > 50) {
+                newProfile = 'extreme'; // Extreme volatility: >100% single move or >50% average
+            } else if (maxChange > 50 || recentAvgVolatility > 25) {
+                newProfile = 'high'; // High volatility: >50% single move or >25% average
+            } else if (maxChange > 20 || recentAvgVolatility > 10) {
+                newProfile = 'normal'; // Normal volatility: >20% single move or >10% average
+            } else {
+                newProfile = 'low'; // Low volatility: <20% moves and <10% average
+            }
+            
+            // Update profile if changed
+            if (newProfile !== strategy.volatilityProfile) {
+                console.log(`📊 Volatility Profile Changed: ${strategy.volatilityProfile} → ${newProfile}`);
+                console.log(`   📊 Max Change: ${maxChange.toFixed(2)}%`);
+                console.log(`   📊 Avg Volatility: ${avgVolatility.toFixed(2)}%`);
+                console.log(`   📊 Recent Avg: ${recentAvgVolatility.toFixed(2)}%`);
+                
+                strategy.volatilityProfile = newProfile;
+                this.updateSmartThresholds(strategy);
+            }
+            
+            return newProfile;
+            
+        } catch (error) {
+            console.error(`❌ Error analyzing volatility:`, error.message);
+            return strategy.volatilityProfile;
+        }
+    }
+    
+    // Update smart thresholds based on volatility profile
+    updateSmartThresholds(strategy) {
+        const profile = strategy.volatilityProfile;
+        const baseDip = strategy.dipThreshold || 15;
+        const baseProfit = strategy.profitRangeMin;
+        
+        console.log(`🧠 Updating Smart Thresholds for ${profile} volatility...`);
+        
+        switch (profile) {
+            case 'low':
+                // In low volatility, be more conservative
+                strategy.smartDipThresholds = {
+                    small: baseDip * 0.5,     // 7.5% - smaller dips
+                    medium: baseDip * 1.0,    // 15% - normal dips
+                    large: baseDip * 1.5,     // 22.5% - larger dips
+                    extreme: baseDip * 2.0    // 30% - extreme for low vol
+                };
+                strategy.smartSellThresholds = {
+                    quick: baseProfit * 0.3,  // 30% of target
+                    normal: baseProfit * 0.7, // 70% of target
+                    good: baseProfit * 1.5,   // 150% of target
+                    excellent: baseProfit * 3, // 300% of target
+                    extreme: baseProfit * 5   // 500% of target
+                };
+                break;
+                
+            case 'normal':
+                // Standard thresholds
+                strategy.smartDipThresholds = {
+                    small: baseDip * 1.0,     // 15% - normal dip
+                    medium: baseDip * 2.0,    // 30% - significant dip
+                    large: baseDip * 3.0,     // 45% - major dip
+                    extreme: baseDip * 4.0    // 60% - extreme dip
+                };
+                strategy.smartSellThresholds = {
+                    quick: baseProfit * 0.5,  // 50% of target
+                    normal: baseProfit * 1.0, // 100% of target
+                    good: baseProfit * 2.0,   // 200% of target
+                    excellent: baseProfit * 5, // 500% of target
+                    extreme: baseProfit * 10  // 1000% of target
+                };
+                break;
+                
+            case 'high':
+                // In high volatility, be more aggressive
+                strategy.smartDipThresholds = {
+                    small: baseDip * 1.5,     // 22.5% - bigger small dips
+                    medium: baseDip * 3.0,    // 45% - bigger medium dips
+                    large: baseDip * 4.5,     // 67.5% - major dips
+                    extreme: baseDip * 6.0    // 90% - extreme dips
+                };
+                strategy.smartSellThresholds = {
+                    quick: baseProfit * 0.7,  // 70% of target
+                    normal: baseProfit * 1.5, // 150% of target
+                    good: baseProfit * 3.0,   // 300% of target
+                    excellent: baseProfit * 7, // 700% of target
+                    extreme: baseProfit * 15  // 1500% of target
+                };
+                break;
+                
+            case 'extreme':
+                // In extreme volatility, maximize opportunities
+                strategy.smartDipThresholds = {
+                    small: baseDip * 2.0,     // 30% - bigger small dips
+                    medium: baseDip * 4.0,    // 60% - significant dips
+                    large: baseDip * 6.0,     // 90% - major dips
+                    extreme: baseDip * 8.0    // 120% - extreme dips (can go below zero)
+                };
+                strategy.smartSellThresholds = {
+                    quick: baseProfit * 1.0,  // 100% of target
+                    normal: baseProfit * 2.0, // 200% of target
+                    good: baseProfit * 5.0,   // 500% of target
+                    excellent: baseProfit * 10, // 1000% of target
+                    extreme: baseProfit * 25  // 2500% of target
+                };
+                break;
+        }
+        
+        console.log(`   📉 DIP Thresholds: Small: ${strategy.smartDipThresholds.small}%, Medium: ${strategy.smartDipThresholds.medium}%, Large: ${strategy.smartDipThresholds.large}%, Extreme: ${strategy.smartDipThresholds.extreme}%`);
+        console.log(`   📈 SELL Thresholds: Quick: ${strategy.smartSellThresholds.quick}%, Normal: ${strategy.smartSellThresholds.normal}%, Good: ${strategy.smartSellThresholds.good}%, Excellent: ${strategy.smartSellThresholds.excellent}%, Extreme: ${strategy.smartSellThresholds.extreme}%`);
+    }
+    
+    // Analyze smart sell opportunity based on volatility-adjusted thresholds
+    analyzeSmartSellOpportunity(strategy, profitPercent) {
+        try {
+            const thresholds = strategy.smartSellThresholds;
+            
+            // Determine sell level and urgency
+            if (profitPercent >= thresholds.extreme) {
+                return {
+                    shouldSell: true,
+                    level: 'extreme',
+                    threshold: thresholds.extreme,
+                    urgency: 'emergency',
+                    reason: 'extreme_profit_jump'
+                };
+            } else if (profitPercent >= thresholds.excellent) {
+                return {
+                    shouldSell: true,
+                    level: 'excellent',
+                    threshold: thresholds.excellent,
+                    urgency: 'immediate',
+                    reason: 'excellent_profit'
+                };
+            } else if (profitPercent >= thresholds.good) {
+                return {
+                    shouldSell: true,
+                    level: 'good',
+                    threshold: thresholds.good,
+                    urgency: 'high',
+                    reason: 'good_profit'
+                };
+            } else if (profitPercent >= thresholds.normal) {
+                return {
+                    shouldSell: true,
+                    level: 'normal',
+                    threshold: thresholds.normal,
+                    urgency: 'medium',
+                    reason: 'profit_target_reached'
+                };
+            } else if (profitPercent >= thresholds.quick) {
+                return {
+                    shouldSell: true,
+                    level: 'quick',
+                    threshold: thresholds.quick,
+                    urgency: 'low',
+                    reason: 'quick_profit'
+                };
+            } else {
+                return {
+                    shouldSell: false,
+                    level: 'none',
+                    threshold: thresholds.quick,
+                    urgency: 'none',
+                    reason: 'profit_insufficient'
+                };
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error analyzing smart sell opportunity:`, error.message);
+            return {
+                shouldSell: false,
+                level: 'error',
+                threshold: 0,
+                urgency: 'none',
+                reason: 'analysis_error'
+            };
+        }
+    }
+    
+    // Smart DIP detection and buying logic
+    async executeSmartDipBuy(strategy, currentPrice, dipPercent) {
+        try {
+            console.log(`🧠 Smart DIP Analysis for ${strategy.name}:`);
+            console.log(`   📊 Current DIP: ${dipPercent.toFixed(2)}%`);
+            console.log(`   📊 Volatility Profile: ${strategy.volatilityProfile}`);
+            
+            let dipLevel = 'none';
+            let buyAmount = 0;
+            let urgency = 'normal';
+            
+            // Determine DIP level and appropriate response
+            if (dipPercent >= strategy.smartDipThresholds.extreme) {
+                dipLevel = 'extreme';
+                buyAmount = strategy.smartPositionSizing.extreme;
+                urgency = 'immediate';
+                console.log(`🚨🚨 EXTREME DIP DETECTED! 🚨🚨`);
+            } else if (dipPercent >= strategy.smartDipThresholds.large) {
+                dipLevel = 'large';
+                buyAmount = strategy.smartPositionSizing.large;
+                urgency = 'high';
+                console.log(`🚨 LARGE DIP DETECTED! 🚨`);
+            } else if (dipPercent >= strategy.smartDipThresholds.medium) {
+                dipLevel = 'medium';
+                buyAmount = strategy.smartPositionSizing.medium;
+                urgency = 'medium';
+                console.log(`⚡ MEDIUM DIP DETECTED! ⚡`);
+            } else if (dipPercent >= strategy.smartDipThresholds.small) {
+                dipLevel = 'small';
+                buyAmount = strategy.smartPositionSizing.small;
+                urgency = 'low';
+                console.log(`📉 Small DIP detected`);
+            } else {
+                console.log(`   📊 DIP not significant enough for action (${dipPercent.toFixed(2)}% < ${strategy.smartDipThresholds.small}%)`);
+                return null;
+            }
+            
+            console.log(`   📊 DIP Level: ${dipLevel.toUpperCase()}`);
+            console.log(`   📊 Buy Amount: ${buyAmount.toFixed(6)} WLD`);
+            console.log(`   📊 Urgency: ${urgency.toUpperCase()}`);
+            console.log(`   🚀 Executing smart DIP buy...`);
+            
+            // Execute the buy
+            const result = await this.sinclaveEngine.executeOptimizedSwap(
+                strategy.walletObject,
+                this.WLD_ADDRESS,
+                strategy.targetToken,
+                buyAmount,
+                strategy.maxSlippage
+            );
+            
+            if (result.success) {
+                const tokensReceived = parseFloat(result.amountOut);
+                
+                // Create position record
+                const position = {
+                    id: `pos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    entryPrice: currentPrice,
+                    entryAmountWLD: buyAmount,
+                    entryAmountToken: tokensReceived,
+                    entryTimestamp: Date.now(),
+                    dipLevel: dipLevel,
+                    dipPercent: dipPercent,
+                    volatilityProfile: strategy.volatilityProfile,
+                    status: 'open'
+                };
+                
+                strategy.positions.push(position);
+                strategy.totalTrades++;
+                strategy.lastTradeTimestamp = Date.now();
+                
+                console.log(`✅ Smart DIP Buy Executed Successfully!`);
+                console.log(`   💰 Spent: ${buyAmount.toFixed(6)} WLD`);
+                console.log(`   📈 Received: ${tokensReceived.toFixed(6)} tokens`);
+                console.log(`   📊 Entry Price: ${currentPrice.toFixed(8)} WLD per token`);
+                console.log(`   📊 Position ID: ${position.id}`);
+                
+                // Send Telegram notification
+                if (this.telegramNotifications) {
+                    await this.telegramNotifications.notifyTradeExecution({
+                        type: 'buy',
+                        tokenSymbol: strategy.targetTokenSymbol || strategy.name,
+                        amount: buyAmount.toFixed(6),
+                        outputAmount: tokensReceived.toFixed(6),
+                        price: currentPrice.toFixed(8),
+                        reason: `Smart ${dipLevel.toUpperCase()} DIP Buy (${dipPercent.toFixed(1)}% dip, ${strategy.volatilityProfile} volatility)`,
+                        dipLevel: dipLevel,
+                        volatility: strategy.volatilityProfile
+                    });
+                }
+                
+                this.saveStrategies();
+                return position;
+                
+            } else {
+                console.log(`❌ Smart DIP Buy Failed: ${result.error}`);
+                return null;
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error in smart DIP buy:`, error.message);
+            return null;
         }
     }
     
