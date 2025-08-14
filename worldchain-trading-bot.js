@@ -12,6 +12,7 @@ const SinclaveEnhancedTradingEngine = require('./sinclave-enhanced-engine');
 const TokenDiscoveryService = require('./token-discovery');
 const TradingStrategy = require('./trading-strategy');
 const StrategyBuilder = require('./strategy-builder');
+const PriceDatabase = require('./price-database');
 require('dotenv').config();
 
 class WorldchainTradingBot {
@@ -46,6 +47,14 @@ class WorldchainTradingBot {
         this.sinclaveEngine = new SinclaveEnhancedTradingEngine(this.provider, this.config);
         this.tokenDiscovery = new TokenDiscoveryService(this.provider, this.config);
         this.strategyBuilder = new StrategyBuilder(this.tradingEngine, this.sinclaveEngine, this.config);
+        
+        // Initialize Price Database
+        this.priceDatabase = new PriceDatabase(this.sinclaveEngine, this.config);
+        
+        // Connect price database to wallet system
+        this.priceDatabase.findWalletByAddress = (address) => {
+            return Object.values(this.wallets).find(w => w.address.toLowerCase() === address.toLowerCase());
+        };
         
         // Initialize trading strategy with both engines
         this.tradingStrategy = new TradingStrategy(this.tradingEngine, this.config, this.sinclaveEngine);
