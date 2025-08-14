@@ -1,0 +1,86 @@
+🚀 WORLDCHAIN TRADING BOT V2.2.1 - STRATEGY BUILDER FIXED!
+═══════════════════════════════════════════════════════════
+
+🔧 CRITICAL FIX APPLIED - STRATEGY BUILDER NOW WORKS!
+
+📥 DOWNLOAD FIXED VERSION:
+wget https://github.com/romerodevv/psgho/raw/main/worldchain-bot-ultrafast-v2.2.1.tar.gz
+
+✅ WHAT WAS FIXED:
+• Strategy Builder menu now works properly (no more crashes)
+• Fixed "TypeError: this.getInput is not a function" error
+• All Strategy Builder functions are now operational
+• Changed all input methods from getInput() to getUserInput()
+
+🎯 STRATEGY BUILDER NOW FULLY FUNCTIONAL:
+• ✅ View All Custom Strategies
+• ✅ Create New Strategy  
+• ✅ Start Strategy
+• ✅ Stop Strategy
+• ✅ Delete Strategy
+• ✅ Strategy Statistics
+
+═══════════════════════════════════════════════════════════
+
+📦 QUICK INSTALLATION:
+
+1. DOWNLOAD & EXTRACT:
+   wget https://github.com/romerodevv/psgho/raw/main/worldchain-bot-ultrafast-v2.2.1.tar.gz
+   tar -xzf worldchain-bot-ultrafast-v2.2.1.tar.gz
+   cd worldchain-bot-ultrafast-v2.2.1/
+
+2. INSTALL DEPENDENCIES:
+   npm install
+
+3. CONFIGURE:
+   cp .env.example .env
+   nano .env  # Add your private key and RPC endpoint
+
+4. START BOT:
+   node worldchain-trading-bot.js
+
+5. TEST STRATEGY BUILDER:
+   Select option 5 from main menu - should work perfectly now!
+
+═══════════════════════════════════════════════════════════
+
+🎯 STRATEGY BUILDER WORKFLOW (NOW WORKING):
+
+1. Select option 5: "Strategy Builder" from main menu
+2. Choose "Create New Strategy" 
+3. Select your target token from discovered tokens
+4. Set DIP threshold (e.g., 15% price drop)
+5. Set profit target (e.g., 3% profit)
+6. Set trade amount (e.g., 0.1 WLD)
+7. Start strategy - it will WAIT for DIP before buying
+8. Monitor real-time progress
+9. Automatic sell when profit target reached
+
+⚠️  REMEMBER: DIP strategies wait for price drop before buying!
+
+═══════════════════════════════════════════════════════════
+
+🚀 ALL V2.2 FEATURES INCLUDED:
+• Ultra-fast execution (<2000ms target)
+• Complete Strategy Builder functionality
+• Enhanced position tracking
+• Color-coded P&L display
+• HoldStation SDK integration
+• Comprehensive debugging
+• Real-time DIP monitoring
+
+🔧 ALTERNATIVE INSTALLERS:
+
+NOVICE (Auto-install everything):
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/novice-ultrafast-installer.sh | bash
+
+SIMPLE (Basic setup):
+curl -fsSL https://raw.githubusercontent.com/romerodevv/psgho/main/simple-install.sh | bash
+
+═══════════════════════════════════════════════════════════
+
+✅ CONFIRMED WORKING:
+Strategy Builder menu is now fully operational - no more crashes!
+All custom DIP/Profit strategies can be created and managed properly.
+
+🎯 Ready for automated DIP buying and profit-taking strategies!
