@@ -239,10 +239,38 @@ class StrategyBuilder extends EventEmitter {
         return priceData.price;
     }
     
-    // Check for DIP buying opportunity
+    // Check for DIP buying opportunity with AVERAGE PRICE PROTECTION
     async checkForDipOpportunity(strategy, priceHistory, currentPrice) {
         if (priceHistory.length < 2) {
             return; // Need at least 2 price points
+        }
+        
+        // Calculate our current average price from existing positions
+        const openPositions = strategy.positions.filter(p => p.status === 'open');
+        let averagePrice = null;
+        
+        if (openPositions.length > 0) {
+            // Calculate weighted average price from all open positions
+            let totalWLD = 0;
+            let totalTokens = 0;
+            
+            openPositions.forEach(pos => {
+                totalWLD += pos.entryAmountWLD;
+                totalTokens += pos.entryAmountToken;
+            });
+            
+            // Average price = total WLD spent / total tokens received
+            averagePrice = totalWLD / totalTokens;
+            
+            console.log(`📊 Current Average Price: ${averagePrice.toFixed(8)} WLD per token`);
+            console.log(`📊 Current Market Price: ${currentPrice.toFixed(8)} WLD per token`);
+            
+            // CRITICAL: Only buy if current price is AT OR BELOW our average price
+            if (currentPrice > averagePrice) {
+                console.log(`⚠️  Price Protection: Current price (${currentPrice.toFixed(8)}) is HIGHER than average (${averagePrice.toFixed(8)})`);
+                console.log(`   🚫 NOT buying - we only buy when price is same or lower than our average`);
+                return;
+            }
         }
         
         // Find the highest price in the timeframe
@@ -256,14 +284,19 @@ class StrategyBuilder extends EventEmitter {
             console.log(`   📊 Price drop: ${priceDrop.toFixed(2)}% (Target: ${strategy.dipThreshold}%)`);
             console.log(`   📈 High: ${highestPrice.toFixed(8)} WLD`);
             console.log(`   📉 Current: ${currentPrice.toFixed(8)} WLD`);
-            console.log(`   🚀 Executing DIP buy...`);
             
-            await this.executeDipBuy(strategy, currentPrice);
+            if (averagePrice) {
+                const avgComparison = ((currentPrice - averagePrice) / averagePrice) * 100;
+                console.log(`   📊 vs Average: ${avgComparison >= 0 ? '+' : ''}${avgComparison.toFixed(2)}% (${currentPrice <= averagePrice ? '✅ GOOD' : '❌ TOO HIGH'})`);
+            }
+            
+            console.log(`   🚀 Executing DIP buy...`);
+            await this.executeDipBuy(strategy, currentPrice, averagePrice);
         }
     }
     
-    // Execute a DIP buy trade
-    async executeDipBuy(strategy, entryPrice) {
+    // Execute a DIP buy trade with AVERAGE PRICE TRACKING
+    async executeDipBuy(strategy, entryPrice, previousAveragePrice) {
         try {
             console.log(`🔄 Executing DIP buy: ${strategy.tradeAmount} WLD → ${strategy.tokenSymbol}`);
             
@@ -277,6 +310,9 @@ class StrategyBuilder extends EventEmitter {
             );
             
             if (result && result.success) {
+                const tokensReceived = parseFloat(result.tokensReceived || result.amountOut || 0);
+                const actualEntryPrice = strategy.tradeAmount / tokensReceived; // Actual price paid
+                
                 // Create position record
                 const position = {
                     id: `pos_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -285,9 +321,9 @@ class StrategyBuilder extends EventEmitter {
                     status: 'open',
                     
                     // Entry data
-                    entryPrice: entryPrice,
+                    entryPrice: actualEntryPrice, // Use actual executed price
                     entryAmountWLD: strategy.tradeAmount,
-                    entryAmountToken: parseFloat(result.tokensReceived || result.amountOut || 0),
+                    entryAmountToken: tokensReceived,
                     entryTimestamp: Date.now(),
                     entryTxHash: result.transactionHash || result.txHash,
                     
@@ -304,11 +340,30 @@ class StrategyBuilder extends EventEmitter {
                 strategy.totalTrades++;
                 strategy.lastExecuted = Date.now();
                 
+                // Calculate new average price after this purchase
+                const allPositions = strategy.positions.filter(p => p.status === 'open');
+                const totalWLD = allPositions.reduce((sum, pos) => sum + pos.entryAmountWLD, 0);
+                const totalTokens = allPositions.reduce((sum, pos) => sum + pos.entryAmountToken, 0);
+                const newAveragePrice = totalWLD / totalTokens;
+                const newTargetPrice = newAveragePrice * (1 + strategy.profitTarget / 100);
+                
                 console.log(`✅ DIP buy executed successfully!`);
                 console.log(`   📊 Position: ${position.id}`);
-                console.log(`   💰 Entry: ${strategy.tradeAmount} WLD → ${position.entryAmountToken} tokens`);
-                console.log(`   📈 Entry Price: ${entryPrice.toFixed(8)} WLD per token`);
-                console.log(`   🎯 Profit Target: ${position.targetPrice.toFixed(8)} WLD per token`);
+                console.log(`   💰 Entry: ${strategy.tradeAmount} WLD → ${position.entryAmountToken.toFixed(6)} tokens`);
+                console.log(`   📈 Entry Price: ${actualEntryPrice.toFixed(8)} WLD per token`);
+                
+                if (previousAveragePrice) {
+                    console.log(`   📊 Previous Avg: ${previousAveragePrice.toFixed(8)} WLD per token`);
+                    console.log(`   📊 New Average: ${newAveragePrice.toFixed(8)} WLD per token`);
+                    const improvement = ((previousAveragePrice - newAveragePrice) / previousAveragePrice) * 100;
+                    console.log(`   📉 Average improved by: ${improvement.toFixed(2)}%`);
+                } else {
+                    console.log(`   📊 Initial Average: ${newAveragePrice.toFixed(8)} WLD per token`);
+                }
+                
+                console.log(`   🎯 New Profit Target: ${newTargetPrice.toFixed(8)} WLD per token (${strategy.profitTarget}%)`);
+                console.log(`   💼 Total Positions: ${allPositions.length}`);
+                console.log(`   💰 Total Investment: ${totalWLD.toFixed(6)} WLD`);
                 console.log(`   🧾 TX: ${position.entryTxHash}`);
                 
                 this.saveStrategies();
@@ -324,34 +379,60 @@ class StrategyBuilder extends EventEmitter {
         }
     }
     
-    // Check position for profit target
+    // Check position for profit target based on AVERAGE PRICE
     async checkPositionForProfit(strategy, position) {
         try {
-            // Get current WLD value of the position using reverse swap quote
-            const reverseQuote = await this.sinclaveEngine.getHoldStationQuote(
+            // Calculate current average price from all open positions
+            const openPositions = strategy.positions.filter(p => p.status === 'open');
+            let totalWLD = 0;
+            let totalTokens = 0;
+            
+            openPositions.forEach(pos => {
+                totalWLD += pos.entryAmountWLD;
+                totalTokens += pos.entryAmountToken;
+            });
+            
+            const averagePrice = totalWLD / totalTokens;
+            const targetPrice = averagePrice * (1 + strategy.profitTarget / 100);
+            
+            // Get current market price using a small test amount
+            const testQuote = await this.sinclaveEngine.getHoldStationQuote(
                 strategy.targetToken,
                 this.WLD_ADDRESS,
-                position.entryAmountToken,
+                1, // 1 token to get price per token
                 strategy.walletObject.address
             );
             
-            if (reverseQuote && reverseQuote.expectedOutput) {
-                const currentWLDValue = parseFloat(reverseQuote.expectedOutput);
-                const unrealizedPnL = currentWLDValue - position.entryAmountWLD;
-                const unrealizedPnLPercent = (unrealizedPnL / position.entryAmountWLD) * 100;
+            if (testQuote && testQuote.expectedOutput) {
+                const currentPrice = parseFloat(testQuote.expectedOutput); // WLD per token
+                
+                // Calculate total portfolio value at current price
+                const totalCurrentValue = totalTokens * currentPrice;
+                const unrealizedPnL = totalCurrentValue - totalWLD;
+                const unrealizedPnLPercent = (unrealizedPnL / totalWLD) * 100;
                 
                 // Update position data
                 position.unrealizedPnL = unrealizedPnL;
                 position.unrealizedPnLPercent = unrealizedPnLPercent;
                 
-                // Check if profit target is reached
-                if (unrealizedPnLPercent >= strategy.profitTarget) {
+                console.log(`📊 Portfolio Status for ${strategy.name}:`);
+                console.log(`   📊 Average Price: ${averagePrice.toFixed(8)} WLD per token`);
+                console.log(`   📊 Current Price: ${currentPrice.toFixed(8)} WLD per token`);
+                console.log(`   📊 Target Price: ${targetPrice.toFixed(8)} WLD per token`);
+                console.log(`   💰 Total Investment: ${totalWLD.toFixed(6)} WLD`);
+                console.log(`   📈 Current Value: ${totalCurrentValue.toFixed(6)} WLD`);
+                console.log(`   💹 Unrealized P&L: ${unrealizedPnL.toFixed(6)} WLD (${unrealizedPnLPercent.toFixed(2)}%)`);
+                
+                // Check if profit target is reached BASED ON AVERAGE PRICE
+                if (currentPrice >= targetPrice) {
                     console.log(`🎯 PROFIT TARGET REACHED for ${strategy.name}!`);
-                    console.log(`   📊 Profit: ${unrealizedPnLPercent.toFixed(2)}% (Target: ${strategy.profitTarget}%)`);
-                    console.log(`   💰 Expected return: ${currentWLDValue.toFixed(6)} WLD`);
-                    console.log(`   🚀 Executing profit sell...`);
+                    console.log(`   📊 Current price (${currentPrice.toFixed(8)}) >= Target (${targetPrice.toFixed(8)})`);
+                    console.log(`   📊 Portfolio profit: ${unrealizedPnLPercent.toFixed(2)}% (Target: ${strategy.profitTarget}%)`);
+                    console.log(`   💰 Expected return: ${totalCurrentValue.toFixed(6)} WLD`);
+                    console.log(`   🚀 Executing profit sell for ALL positions...`);
                     
-                    await this.executeProfitSell(strategy, position, currentWLDValue);
+                    // Sell ALL positions since we calculate profit based on average
+                    await this.executeProfitSellAll(strategy, openPositions, currentPrice);
                 }
             }
             
@@ -360,7 +441,69 @@ class StrategyBuilder extends EventEmitter {
         }
     }
     
-    // Execute profit sell
+    // Execute profit sell for ALL positions (based on average price strategy)
+    async executeProfitSellAll(strategy, positions, currentPrice) {
+        try {
+            // Calculate total tokens to sell
+            let totalTokensToSell = 0;
+            positions.forEach(pos => {
+                totalTokensToSell += pos.entryAmountToken;
+            });
+            
+            console.log(`🔄 Executing profit sell: ${totalTokensToSell} ${strategy.tokenSymbol} → WLD`);
+            console.log(`   📊 Selling ${positions.length} positions at average profit target`);
+            
+            // Execute the reverse trade for ALL tokens
+            const result = await this.sinclaveEngine.executeOptimizedSwap(
+                strategy.walletObject,
+                strategy.targetToken,
+                this.WLD_ADDRESS,
+                totalTokensToSell,
+                strategy.maxSlippage
+            );
+            
+            if (result && result.success) {
+                const wldReceived = parseFloat(result.tokensReceived || result.amountOut || 0);
+                const totalInvested = positions.reduce((sum, pos) => sum + pos.entryAmountWLD, 0);
+                const realizedPnL = wldReceived - totalInvested;
+                const realizedPnLPercent = (realizedPnL / totalInvested) * 100;
+                
+                // Mark ALL positions as closed
+                positions.forEach(pos => {
+                    pos.status = 'closed';
+                    pos.exitPrice = currentPrice;
+                    pos.exitAmountWLD = (pos.entryAmountWLD / totalInvested) * wldReceived; // Proportional
+                    pos.exitTimestamp = Date.now();
+                    pos.exitTxHash = result.transactionHash || result.txHash;
+                    pos.realizedPnL = pos.exitAmountWLD - pos.entryAmountWLD;
+                    pos.realizedPnLPercent = (pos.realizedPnL / pos.entryAmountWLD) * 100;
+                });
+                
+                // Update strategy statistics
+                strategy.successfulTrades++;
+                strategy.totalProfit += realizedPnL;
+                strategy.lastExecuted = Date.now();
+                
+                console.log(`✅ Profit sell executed successfully!`);
+                console.log(`   📊 Sold: ${totalTokensToSell} tokens → ${wldReceived.toFixed(6)} WLD`);
+                console.log(`   💰 Total Invested: ${totalInvested.toFixed(6)} WLD`);
+                console.log(`   💹 Realized P&L: ${realizedPnL.toFixed(6)} WLD (${realizedPnLPercent.toFixed(2)}%)`);
+                console.log(`   🧾 TX: ${result.transactionHash || result.txHash}`);
+                
+                this.saveStrategies();
+                this.emit('profitSellExecuted', { strategy, positions, result, realizedPnL });
+                
+            } else {
+                throw new Error('Profit sell execution failed');
+            }
+            
+        } catch (error) {
+            console.error(`❌ Profit sell failed for ${strategy.name}:`, error.message);
+            this.emit('profitSellFailed', { strategy, error: error.message });
+        }
+    }
+
+    // Execute profit sell (legacy - keeping for compatibility)
     async executeProfitSell(strategy, position, expectedWLDReturn) {
         try {
             console.log(`🔄 Executing profit sell: ${position.entryAmountToken} ${strategy.tokenSymbol} → WLD`);
