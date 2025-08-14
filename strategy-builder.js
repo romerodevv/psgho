@@ -328,7 +328,7 @@ class StrategyBuilder extends EventEmitter {
     // Execute a DIP buy trade with AVERAGE PRICE TRACKING
     async executeDipBuy(strategy, entryPrice, previousAveragePrice) {
         try {
-            console.log(`🔄 Executing DIP buy: ${strategy.tradeAmount} WLD → ${strategy.tokenSymbol}`);
+            console.log(`🔄 Executing DIP buy: ${strategy.tradeAmount} WLD → ${strategy.targetTokenSymbol}`);
             
             // Execute the trade using Sinclave Enhanced Engine
             const result = await this.sinclaveEngine.executeOptimizedSwap(
@@ -480,7 +480,7 @@ class StrategyBuilder extends EventEmitter {
                 totalTokensToSell += pos.entryAmountToken;
             });
             
-            console.log(`🔄 Executing profit sell: ${totalTokensToSell} ${strategy.tokenSymbol} → WLD`);
+            console.log(`🔄 Executing profit sell: ${totalTokensToSell} ${strategy.targetTokenSymbol} → WLD`);
             console.log(`   📊 Selling ${positions.length} positions at average profit target`);
             
             // Execute the reverse trade for ALL tokens
@@ -536,7 +536,7 @@ class StrategyBuilder extends EventEmitter {
     // Execute profit sell (legacy - keeping for compatibility)
     async executeProfitSell(strategy, position, expectedWLDReturn) {
         try {
-            console.log(`🔄 Executing profit sell: ${position.entryAmountToken} ${strategy.tokenSymbol} → WLD`);
+            console.log(`🔄 Executing profit sell: ${position.entryAmountToken} ${strategy.targetTokenSymbol} → WLD`);
             
             // Execute the reverse trade
             const result = await this.sinclaveEngine.executeOptimizedSwap(

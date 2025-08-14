@@ -2283,30 +2283,67 @@ class WorldchainTradingBot {
                 return;
             }
 
-            // Show available tokens for selection
-            console.log('\n📋 Available Tokens:');
-            const tokens = Array.from(this.discoveredTokens.entries());
+            // Show available trading pairs for selection
+            console.log('\n📋 Available Trading Pairs:');
             
-            if (tokens.length === 0) {
-                console.log('❌ No tokens discovered. Please run Token Discovery first.');
+            // Popular Worldchain tokens
+            const popularTokens = [
+                { address: '0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63', symbol: 'ORO', name: 'ORO Token' },
+                { address: '0x1a16f733b813a59815a76293dac835ad1c7fedff', symbol: 'YIELD', name: 'YIELD Token' },
+                { address: '0xc6f44893a558d9ae0576a2bb6bfa9c1c3f313815', symbol: 'Ramen', name: 'Ramen Token' }
+            ];
+            
+            // Add discovered tokens
+            const discoveredTokensList = [];
+            for (const [address, token] of Object.entries(this.discoveredTokens)) {
+                if (address.toLowerCase() !== this.WLD_ADDRESS.toLowerCase()) {
+                    discoveredTokensList.push({
+                        address: address,
+                        symbol: token.symbol || 'Unknown',
+                        name: token.name || 'Unknown Token'
+                    });
+                }
+            }
+            
+            // Combine popular + discovered tokens (remove duplicates)
+            const allTokens = [...popularTokens];
+            discoveredTokensList.forEach(discovered => {
+                if (!allTokens.find(token => token.address.toLowerCase() === discovered.address.toLowerCase())) {
+                    allTokens.push(discovered);
+                }
+            });
+            
+            if (allTokens.length === 0) {
+                console.log('❌ No trading pairs available.');
+                console.log('💡 Try running Token Discovery or add tokens manually first.');
                 await this.getUserInput('Press Enter to continue...');
                 return;
             }
 
-            tokens.forEach(([address, token], index) => {
-                console.log(`${index + 1}. ${token.symbol || 'Unknown'} (${address})`);
+            allTokens.forEach((token, index) => {
+                const isDiscovered = this.discoveredTokens[token.address] ? '✅' : '📊';
+                console.log(`${index + 1}. ${isDiscovered} WLD → ${token.symbol} (${token.name})`);
+                console.log(`   📍 ${token.address}`);
             });
 
-            const tokenChoice = await this.getUserInput('\nSelect target token (number): ');
+            console.log('\n💡 ✅ = Token found in your wallet, 📊 = Popular token');
+
+            const tokenChoice = await this.getUserInput('\nSelect trading pair (number): ');
             const tokenIndex = parseInt(tokenChoice) - 1;
             
-            if (tokenIndex < 0 || tokenIndex >= tokens.length) {
+            if (tokenIndex < 0 || tokenIndex >= allTokens.length) {
                 console.log('❌ Invalid token selection.');
                 await this.getUserInput('Press Enter to continue...');
                 return;
             }
 
-            const [targetToken, tokenInfo] = tokens[tokenIndex];
+            const selectedToken = allTokens[tokenIndex];
+            const targetToken = selectedToken.address;
+            const tokenInfo = {
+                symbol: selectedToken.symbol,
+                name: selectedToken.name,
+                address: selectedToken.address
+            };
 
             // Get strategy parameters
             const dipThreshold = parseFloat(await this.getUserInput('DIP Threshold % (e.g., 5 for 5% drop): '));
@@ -2338,7 +2375,8 @@ class WorldchainTradingBot {
                 name: name.trim(),
                 baseToken: this.WLD_ADDRESS,
                 targetToken,
-                targetTokenSymbol: tokenInfo.symbol || 'Unknown',
+                targetTokenSymbol: tokenInfo.symbol,
+                targetTokenName: tokenInfo.name,
                 dipThreshold,
                 profitTarget,
                 tradeAmount,
@@ -2352,7 +2390,7 @@ class WorldchainTradingBot {
             console.log(`\n✅ Custom strategy created successfully!`);
             console.log(`📋 Strategy ID: ${strategyId}`);
             console.log(`📊 Name: ${name}`);
-            console.log(`💱 Pair: WLD → ${tokenInfo.symbol || 'Unknown'}`);
+            console.log(`💱 Pair: WLD → ${tokenInfo.symbol} (${tokenInfo.name})`);
             console.log(`📉 DIP Threshold: ${dipThreshold}%`);
             console.log(`📈 Profit Target: ${profitTarget}%`);
             console.log(`💰 Trade Amount: ${tradeAmount} WLD`);
